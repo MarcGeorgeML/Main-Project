@@ -7,6 +7,12 @@ Stage C — Multimodal Spike Alignment + Fusion + Normalization + Noise
 - Small Gaussian noise per timestep
 - No dependency on tuning_results unless explicitly requested
 - Preserves all tensor shapes
+
+Usage: (preview)
+    python preprocess_stage_c.py --input_root features_preview --output_root spike_features_preview --fusion_mode concat --normalize_spikes
+    
+Usage: (full)
+    python preprocess_stage_c.py
 """
 
 from __future__ import annotations

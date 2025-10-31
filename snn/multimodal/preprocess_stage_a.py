@@ -148,7 +148,7 @@ def main():
     parser.add_argument(
         "--cache_dir",
         type=str,
-        default="cache_dir",
+        default="cache",
         help="Directory to store normalized cache files before feature extraction",
     )
     parser.add_argument(

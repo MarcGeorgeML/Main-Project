@@ -159,7 +159,7 @@ def main():
     parser.add_argument(
         "--cache_dir",
         type=str,
-        default="cache_dir",
+        default="cache",
         help="Directory containing cached embeddings or features",
     )
     parser.add_argument(
