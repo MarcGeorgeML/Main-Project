@@ -2,3 +2,5 @@
 data/**
 data_sorted/**
 cache_preview/**
+features_preview/**
+final_features_preview/**
