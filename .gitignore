@@ -7,6 +7,4 @@ Project/backend/snn_best_model.pth
 .python-version
 .venv
 
-# data files
-snn/multimodal/data/**
-snn/multimodal/data_sorted/**
+

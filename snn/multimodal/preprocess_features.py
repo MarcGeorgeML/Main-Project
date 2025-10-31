@@ -5,7 +5,11 @@ Optimized for extracting facial landmarks, crops, and audio mels efficiently.
 No re-encoding required.
 
 Usage:
-  python preprocess_features_fastpreview.py --input_root data_sorted --output_root data/features_preview --cache_dir cache_preview --run_stage both --preview 20
+  for previewing a small subset of data:
+  python preprocess_features.py --input_root data_sorted --output_root features_preview --cache_dir cache_preview --run_stage both --preview 20
+  
+  for full dataset processing:
+  python preprocess_features.py --input_root data_sorted --output_root features --cache_dir cache --run_stage both
 """
 
 import os
@@ -316,8 +320,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--input_root', type=str, default='data_sorted')
     ap.add_argument('--index_csv', type=str, default='data_sorted/dataset_index.csv')
-    ap.add_argument('--output_root', type=str, default='data/features_preview')
-    ap.add_argument('--cache_dir', type=str, default='cache_preview')
+    ap.add_argument('--output_root', type=str, default='features')
+    ap.add_argument('--cache_dir', type=str, default='cache')
     ap.add_argument('--preview', type=int, default=0)
     ap.add_argument('--run_stage', type=str, default='both', choices=['A', 'B', 'both'])
     ap.add_argument('--force', action='store_true')
