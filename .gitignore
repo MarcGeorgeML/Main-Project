@@ -1,35 +1,8 @@
-# logs
-persistent-terminals.log
-
-# data and embeddings
-snn/multimodal-snn/data/**
-snn/multimodal/AFEW-VA/**
-
 # caches
 **/__pycache__/
 
-# multimodal checkpoints / models
-snn/multimodal-snn/models/checkpoints/
-snn/multimodal-snn/checkpoints/
-snn/multimodal-snn/checkpoints_snn/
-
-# model files
-snn/multimodal-snn/model_state.pth
-snn/multimodal-snn/best_model.pth
-snn/multimodal-snn/snn_best_model.pth
-
-# feature files
-snn/multimodal-snn/data/features/*.pkl
-
-# frontend node modules
-Project/frontend/node_modules/
-
 # backend model files
-Project/backend/model_state.pth
 Project/backend/snn_best_model.pth
-
-# audio-specific caches
-Project/backend/**/__pycache__/
 
 # data files
 snn/multimodal/data/**
