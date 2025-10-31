@@ -27,6 +27,10 @@ Project/frontend/node_modules/
 # backend model files
 Project/backend/model_state.pth
 Project/backend/snn_best_model.pth
+.env
+.python-version
+.venv
+best_model.pth
 
 # audio-specific caches
 Project/backend/**/__pycache__/
