@@ -2,17 +2,11 @@
 """
 Stage C — Multimodal Spike Alignment + Fusion + Normalization + Noise
 
-Now defaults to:
- - Dynamic spike generation (per-sample adaptive thresholds)
- - Normalization before thresholding
- - Small Gaussian noise per timestep
- - No dependency on tuning_results unless explicitly requested
-
-Usage:  (full)
-    python preprocess_stage_c.py
-    
-Usage: (preview)
-    python preprocess_stage_c.py --input_root features_preview --output_root spike_features_preview --fusion_mode concat --normalize_spikes
+- Dynamic spike generation (per-sample adaptive thresholds)
+- Normalization before thresholding
+- Small Gaussian noise per timestep
+- No dependency on tuning_results unless explicitly requested
+- Preserves all tensor shapes
 """
 
 from __future__ import annotations
@@ -58,31 +52,42 @@ def load_audio_array(npz_path: Path) -> np.ndarray:
         return data["mel"]
     raise KeyError(f"No key 'mel' found in {npz_path}")
 
-# ---------------- normalization + threshold ----------------
+# ---------------- normalization + noise + threshold ----------------
 def normalize_spike_density(x: torch.Tensor, target_rate: float = 0.05) -> torch.Tensor:
     mean_rate = x.mean()
     if mean_rate <= 1e-6:
         return x
     scale = target_rate / mean_rate
-    return torch.clamp(x * scale, 0, 1)
+    return torch.clamp(x * scale, min=0.0, max=1.0)
 
 def normalize_and_add_noise(x: torch.Tensor, noise_std: float = 0.01) -> torch.Tensor:
-    """Min–max normalize per sample and add small Gaussian noise per timestep."""
     x_min, x_max = x.amin(dim=(1, 2), keepdim=True), x.amax(dim=(1, 2), keepdim=True)
     x_norm = (x - x_min) / (x_max - x_min + 1e-8)
     noise = torch.randn_like(x_norm) * noise_std
-    x_noisy = torch.clamp(x_norm + noise, 0, 1)
-    return x_noisy
-
-def apply_threshold(x: torch.Tensor, thr: float = 0.1) -> torch.Tensor:
-    return (x > thr).float()
+    return torch.clamp(x_norm + noise, min=0.0, max=1.0)
 
 def dynamic_spike_threshold(x: torch.Tensor) -> torch.Tensor:
-    """Adaptive threshold based on mean + 0.5×std (per-sample dynamic mode)."""
     mean_val = x.mean(dim=(1, 2), keepdim=True)
     std_val = x.std(dim=(1, 2), keepdim=True)
     thr = mean_val + 0.5 * std_val
     return (x > thr).float()
+
+def apply_threshold(x: torch.Tensor, thr: float = 0.1) -> torch.Tensor:
+    return (x > thr).float()
+
+def temporal_smooth(x: torch.Tensor, kernel_size: int = 5) -> torch.Tensor:
+    if kernel_size <= 1:
+        return x
+    pad = kernel_size // 2
+    orig_shape = x.shape
+    B = orig_shape[0]
+    T = orig_shape[1]
+    rest = int(np.prod(orig_shape[2:])) if len(orig_shape) > 2 else 1
+    x_reshaped = x.reshape(B, T, rest).permute(0, 2, 1).unsqueeze(1)  # (B,1,rest,T)
+    kernel = torch.ones(1, 1, 1, kernel_size, device=x.device) / float(kernel_size)
+    x_smooth = torch.nn.functional.conv2d(x_reshaped, kernel, padding=(0, pad))
+    x_smooth = x_smooth.squeeze(1).permute(0, 2, 1).reshape(orig_shape)
+    return x_smooth
 
 # ---------------- temporal + fusion ----------------
 def temporal_align(video_x: torch.Tensor, audio_x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -124,19 +129,7 @@ def stage_c_merge(
     ensure_dir(output_root)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     saved = []
-
-    # Optionally load tuned scales
     video_scale, audio_scale = 1.0, 1.0
-    if use_tuned_scales:
-        scale_path = Path("tuning_results/auto_tuned_scales.json")
-        if scale_path.exists():
-            with open(scale_path) as f:
-                scales = json.load(f)
-            video_scale = scales.get("video_scale", 1.0)
-            audio_scale = scales.get("audio_scale", 1.0)
-            clog("INFO", f"Loaded tuned scales — 🎥 video={video_scale:.3f}, 🎧 audio={audio_scale:.3f}")
-        else:
-            clog("WARNING", "Tuned scales requested but not found. Using 1.0 for both.")
 
     emotions = [p for p in input_root.iterdir() if p.is_dir()]
     for emo_dir in emotions:
@@ -165,20 +158,23 @@ def stage_c_merge(
                 if v.ndim == 2: v = v.unsqueeze(0)
                 if a.ndim == 2: a = a.unsqueeze(0)
 
-                # Scaling
-                v = torch.clamp(v * video_scale, 0, 1)
-                a = torch.clamp(a * audio_scale, 0, 1)
+                # Safe scaling
+                v = torch.clamp(v * video_scale, min=0.0, max=1.0)
+                a = torch.clamp(a * audio_scale, min=0.0, max=1.0)
 
+                # Temporal alignment
                 v_aligned, a_aligned = temporal_align(v, a)
 
-                # Normalize spike densities (optional global scaling)
+                # Optional spike density normalization
                 if normalize:
                     v_aligned = normalize_spike_density(v_aligned)
                     a_aligned = normalize_spike_density(a_aligned)
 
-                # === NEW: Normalize before threshold + add Gaussian noise ===
+                # Normalize + noise + temporal smooth
                 v_aligned = normalize_and_add_noise(v_aligned, noise_std=0.01)
                 a_aligned = normalize_and_add_noise(a_aligned, noise_std=0.01)
+                v_aligned = temporal_smooth(v_aligned, kernel_size=5)
+                a_aligned = temporal_smooth(a_aligned, kernel_size=5)
 
                 # Thresholding
                 if dynamic_spikes:
@@ -188,7 +184,10 @@ def stage_c_merge(
                     v_aligned = apply_threshold(v_aligned, threshold)
                     a_aligned = apply_threshold(a_aligned, threshold)
 
+                # Fusion
                 fused = fuse_modalities(v_aligned, a_aligned, mode)
+
+                # Save with shapes unchanged
                 np.savez_compressed(
                     out_emo_dir / f"{stem}_fusion.npz",
                     video_embeddings=to_numpy(v_aligned),
@@ -205,14 +204,13 @@ def stage_c_merge(
 
 # ---------------- CLI ----------------
 def main():
-    parser = argparse.ArgumentParser(description="Stage C — Multimodal Spike Fusion (Dynamic by Default)")
+    parser = argparse.ArgumentParser(description="Stage C — Multimodal Spike Fusion (Dynamic + Noise + Normalize)")
     parser.add_argument("--input_root", type=str, default="features", help="Input root with Stage B outputs")
     parser.add_argument("--output_root", type=str, default="spike_features", help="Output folder for fused spikes")
     parser.add_argument("--fusion_mode", type=str, default="concat", choices=["concat", "sum"])
     parser.add_argument("--normalize_spikes", action="store_true", help="Normalize spike densities")
     parser.add_argument("--threshold", type=float, default=None, help="Manual threshold (used if dynamic disabled)")
     parser.add_argument("--no_dynamic_spikes", action="store_true", help="Disable dynamic thresholding")
-    parser.add_argument("--use_tuned_scales", action="store_true", help="Load tuned scales if available")
 
     args = parser.parse_args()
 
@@ -223,7 +221,6 @@ def main():
     print(f" ├─ Normalize       : {args.normalize_spikes}")
     print(f" ├─ Dynamic spikes  : {not args.no_dynamic_spikes}")
     print(f" ├─ Threshold       : {args.threshold}")
-    print(f" └─ Use tuned scales: {args.use_tuned_scales}\n")
 
     stage_c_merge(
         Path(args.input_root),
@@ -232,7 +229,6 @@ def main():
         normalize=args.normalize_spikes,
         threshold=args.threshold,
         dynamic_spikes=not args.no_dynamic_spikes,
-        use_tuned_scales=args.use_tuned_scales,
     )
 
 if __name__ == "__main__":
