@@ -1,6 +1,3 @@
 # data files
 data/**
 data_sorted/**
-preview/cache_preview/**
-preview/features_preview/**
-preview/spike_features_preview/**
