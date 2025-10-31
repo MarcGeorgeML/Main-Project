@@ -3,6 +3,10 @@
 
 # backend model files
 Project/backend/snn_best_model.pth
+.env
+.python-version
+.venv
+best_model.pth
 
 # data files
 snn/multimodal/data/**
