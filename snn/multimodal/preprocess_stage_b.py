@@ -9,7 +9,7 @@ computes:
 Saves to output_root/<emotion>/<modality>
 
 Usage: (preview)
-  python preprocess_stage_b.py --cache_dir data/preview/cache_preview --output_root data/preview/features_preview --batch_override 16
+  python preprocess_stage_b.py --cache_dir data/preview/cache_preview --output_root data/preview/features_preview
   
 Usage: (full)
   python preprocess_stage_b.py

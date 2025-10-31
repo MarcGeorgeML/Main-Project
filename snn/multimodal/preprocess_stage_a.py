@@ -6,7 +6,7 @@ Traverses data_sorted/<emotion>/<modality> and caches processed, normalized file
 Each pair of aligned video/audio samples are normalized and saved to cache.
 
 Usage: (preview)
-  python preprocess_stage_a.py --input_root data_sorted --cache_dir data/preview/cache_preview --preview 20 --workers 8
+  python preprocess_stage_a.py --input_root data_sorted --cache_dir data/preview/cache_preview --preview 20
   
 Usage: (full)
   python preprocess_stage_a.py
