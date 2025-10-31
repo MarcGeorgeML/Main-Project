@@ -9,7 +9,7 @@ Stage C — Multimodal Spike Alignment + Fusion + Normalization + Noise
 - Preserves all tensor shapes
 
 Usage: (preview)
-    python preprocess_stage_c.py --input_root features_preview --output_root spike_features_preview --fusion_mode concat --normalize_spikes
+    python preprocess_stage_c.py --input_root data/preview/features_preview --output_root data/preview/spike_features_preview --fusion_mode concat --normalize_spikes
     
 Usage: (full)
     python preprocess_stage_c.py
