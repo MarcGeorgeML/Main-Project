@@ -1,5 +1,0 @@
-mamba create -n snn-env python=3.10 -y
-mamba activate snn-gpu
-mamba install numpy pandas librosa scikit-learn pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
-pip install git+https://github.com/openai/CLIP.git
-pip install transformers snntorch
