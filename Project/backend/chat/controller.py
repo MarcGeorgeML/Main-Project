@@ -138,6 +138,7 @@ async def get_messages(
                     "sender": msg.sender.value,
                     "message_type": msg.message_type.value,
                     "message": msg.message,
+                    "transcription": msg.transcription,  # Added transcription field
                     "created_at": msg.created_at
                 }
                 for msg in messages
@@ -230,30 +231,29 @@ async def send_audio_message(
             request_id=request_id
         )
         
-        # Save user audio message (store filename)
-        user_message = services.add_message_to_conversation(
-            db=db,
-            conversation_id=chat_id,
-            user_id=payload.user_id,
-            sender="USER",
-            message_type="AUDIO",
-            message=mp3_filename.name
-        )
-        
-        if not user_message:
-            raise HTTPException(status_code=404, detail="Chat not found")
-        
-        # Process with AI engine
+        # Process with AI engine first to get transcription
         job_message = JobMsgType(
             user_id=payload.user_id,
             type="audio",
             data=mp3_filename.name
         )
         
-
-        
         await redis_client.send_to_engine(request_id, job_message)
         response = await redis_client.wait_for_response(request_id)
+        
+        # Save user audio message with transcription
+        user_message = services.add_message_to_conversation(
+            db=db,
+            conversation_id=chat_id,
+            user_id=payload.user_id,
+            sender="USER",
+            message_type="AUDIO",
+            message=mp3_filename.name,
+            transcription=response.get("transcription")  # Save transcription
+        )
+        
+        if not user_message:
+            raise HTTPException(status_code=404, detail="Chat not found")
         
         # Save AI response
         ai_message = services.add_message_to_conversation(
@@ -269,15 +269,17 @@ async def send_audio_message(
             "user_message": {
                 "id": str(user_message.id),
                 "audio_filename": user_message.message,
-                "created_at": user_message.created_at
+                "transcribed_message": user_message.transcription,  # Return saved transcription
+                "created_at": user_message.created_at,
             },
             "ai_message": {
                 "id": str(ai_message.id),
                 "message": ai_message.message,
-                "created_at": ai_message.created_at
+                "created_at": ai_message.created_at,
             },
             "request_id": request_id
         }
+
     except HTTPException:
         raise
     except Exception as e:

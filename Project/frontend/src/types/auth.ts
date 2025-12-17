@@ -11,6 +11,7 @@ export interface Message {
   message_type: 'TEXT' | 'AUDIO';
   message: string;
   created_at: string;
+  transcription?: string;
 }
 
 export interface ConversationMessages {
@@ -54,6 +55,7 @@ export interface MessageResponse {
   message?: string;
   audio_filename?: string;
   created_at: string;
+  transcribed_message?: string;
 }
 
 export interface TextMessageResponse {

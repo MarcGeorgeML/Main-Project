@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, String, ForeignKey, DateTime, Enum, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -25,5 +25,6 @@ class Message(Base):
     sender = Column(Enum(SenderType), nullable=False)
     message_type = Column(Enum(MessageType), nullable=False)
     message = Column(String, nullable=False)
+    transcription = Column(Text, nullable=True)  # Added field for audio transcriptions
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     conversation = relationship("Conversation", back_populates="messages")

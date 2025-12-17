@@ -1,7 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
 import { getAccessToken, clearAuthData } from './auth';
 import {
-  ConversationCreate,
   ConversationUpdate,
   ChatRequest,
   ConversationResponse,
@@ -53,7 +52,7 @@ export const fetchWithAuth = async <T>(endpoint: string): Promise<AxiosResponse<
 // Generic POST request with auth and payload
 export const postWithAuth = async <TRequest, TResponse>(
     endpoint: string, 
-    data: TRequest
+    data?: TRequest
 ): Promise<AxiosResponse<TResponse>> => {
     return api.post<TResponse>(endpoint, data);
 };
@@ -82,11 +81,9 @@ export const postFormWithAuth = async <T>(
 };
 
 // Conversation APIs
-export const createConversation = async (
-    title?: string
-): Promise<AxiosResponse<ConversationResponse>> => {
-    const payload: ConversationCreate = { title: title || 'New Conversation' };
-    return postWithAuth<ConversationCreate, ConversationResponse>('/chats', payload);
+export const createConversation = async (): Promise<AxiosResponse<ConversationResponse>> => {
+    // Backend auto-generates title, so no payload needed
+    return postWithAuth<void, ConversationResponse>('/chats');
 };
 
 export const getAllConversations = async (): Promise<AxiosResponse<ConversationListResponse>> => {

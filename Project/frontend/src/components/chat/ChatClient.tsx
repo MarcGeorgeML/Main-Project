@@ -16,6 +16,7 @@ import { AxiosError } from "axios";
 
 interface DisplayMessage extends Omit<Message, "id"> {
   id: string;
+  transcription?: string;
 }
 
 export default function ChatClient() {
@@ -50,6 +51,7 @@ export default function ChatClient() {
               return {
                 ...msg,
                 message: getAudioUrl(msg.message),
+                transcription: msg.transcription,
               };
             }
             return msg;
@@ -221,6 +223,7 @@ export default function ChatClient() {
             sender: "USER",
             message_type: "AUDIO",
             message: getAudioUrl(filename),
+            transcription: response.data.user_message.transcribed_message, // Get transcription from response
             created_at: response.data.user_message.created_at,
           };
 
@@ -267,7 +270,6 @@ export default function ChatClient() {
 
   const handleMicClick = (): void => {
     if (isLoading) return;
-    // isRecording ? stopRecording() : startRecording();
     if (isRecording) {
       stopRecording();
     } else {
@@ -391,21 +393,29 @@ export default function ChatClient() {
                       {message.message_type === "TEXT" ? (
                         <p className="text-sm text-white">{message.message}</p>
                       ) : (
-                        <div className="audio-player-wrapper">
-                          <AudioPlayer
-                            src={message.message}
-                            layout="horizontal-reverse"
-                            showJumpControls={false}
-                            customProgressBarSection={[RHAP_UI.PROGRESS_BAR]}
-                            customControlsSection={[
-                              RHAP_UI.MAIN_CONTROLS,
-                              RHAP_UI.DURATION,
-                            ]}
-                            customAdditionalControls={[]}
-                            customVolumeControls={[]}
-                            autoPlayAfterSrcChange={false}
-                            className="voice-message-player"
-                          />
+                        <div className="space-y-2">
+                          <div className="audio-player-wrapper">
+                            <AudioPlayer
+                              src={message.message}
+                              layout="horizontal-reverse"
+                              showJumpControls={false}
+                              customProgressBarSection={[RHAP_UI.PROGRESS_BAR]}
+                              customControlsSection={[
+                                RHAP_UI.MAIN_CONTROLS,
+                                RHAP_UI.DURATION,
+                              ]}
+                              customAdditionalControls={[]}
+                              customVolumeControls={[]}
+                              autoPlayAfterSrcChange={false}
+                              className="voice-message-player"
+                            />
+                          </div>
+
+                          {message.transcription && (
+                            <p className="text-xs text-purple-100 italic leading-snug">
+                              {message.transcription}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

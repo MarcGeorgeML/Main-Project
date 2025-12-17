@@ -123,7 +123,8 @@ def add_message_to_conversation(
     user_id: uuid.UUID,
     sender: str,
     message_type: str,
-    message: str
+    message: str,
+    transcription: Optional[str] = None  # Added transcription parameter
 ) -> Optional[Message]:
     """Add a message to a conversation"""
     # Verify conversation belongs to user
@@ -140,7 +141,8 @@ def add_message_to_conversation(
         conversation_id=uuid.UUID(conversation_id),
         sender=SenderType[sender],
         message_type=MessageType[message_type],
-        message=message
+        message=message,
+        transcription=transcription  # Added transcription field
     )
     
     db.add(new_message)
