@@ -43,3 +43,5 @@ snn/multimodal/data_sorted/**
 
 /Project/temp
 /Project/engine/snn/
+
+snn/test/model
