@@ -1,19 +1,21 @@
-from data.redis_client import RedisClient
-from models.requests import RequestType
-import json
+# engine/main.py
 import os
-from groq import Groq
+import torch
+import opensmile
 from dotenv import load_dotenv
+from groq import Groq
+from transformers import AutoTokenizer, AutoModel
 
-from utils.whisper_transcriber import transcribe_audio 
+from loop.redis_loop import start_redis_loop
+from inference.run_model import load_snn_model
 
-# Load environment variables from .env file
 load_dotenv()
 
-ACK_CHANNEL = "ack_channel"
-JOB_STREAM = "job"
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Initialize Groq client
+# ----------------------------
+# Groq (UNCHANGED)
+# ----------------------------
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def analyze_sentiment(text):
@@ -21,106 +23,58 @@ def analyze_sentiment(text):
     Analyze the emotional sentiment of the text using Groq API.
     Returns a short response message.
     """
-    try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an emotional sentiment analysis chatbot. "
-                        "Analyze the user's message and respond with a short, "
-                        "empathetic message (1-2 sentences) that acknowledges "
-                        "their emotional state and provides supportive feedback."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ],
-            model="llama-3.1-8b-instant",
-            temperature=0.7,
-            max_tokens=100
-        )
-
-        return chat_completion.choices[0].message.content
-
-    except Exception as e:
-        print(f"Error calling Groq API: {e}")
-        return "I'm having trouble analyzing that right now. Please try again."
+    chat_completion = groq_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an emotional sentiment analysis chatbot. "
+                    "Analyze the user's message and respond with a short, "
+                    "empathetic message (1-2 sentences) that acknowledges "
+                    "their emotional state and provides supportive feedback."
+                )
+            },
+            {
+                "role": "user",
+                "content": text
+            }
+        ],
+        model="llama-3.1-8b-instant",
+        temperature=0.7,
+        max_tokens=100
+    )
+    return chat_completion.choices[0].message.content
 
 
-def main():
-    print("\n=================================")
-    print("Starting Senticore Engine...")
-    print("=================================\n")
+# ----------------------------
+# Load pretrained models ONCE
+# ----------------------------
+tokenizer = AutoTokenizer.from_pretrained(
+    "j-hartmann/emotion-english-distilroberta-base"
+)
+text_model = AutoModel.from_pretrained(
+    "j-hartmann/emotion-english-distilroberta-base"
+).to(DEVICE).eval()
 
-    client = RedisClient()
-    client.clear_stream(JOB_STREAM)
+smile = opensmile.Smile(
+    feature_set=opensmile.FeatureSet.eGeMAPSv02,
+    feature_level=opensmile.FeatureLevel.Functionals,
+)
 
-    try:
-        while True:
-            messages = client.read_stream(JOB_STREAM)
+snn_model = load_snn_model(
+    "snn/spikemo_best_IEMOCAP.pt",
+    device=DEVICE
+)
 
-            for message_id, message_data in messages:
-                try:
-                    if isinstance(message_data.get("data"), str):
-                        message_data["data"] = json.loads(message_data["data"])
-
-                    request = RequestType(**message_data)
-                    data = request.data
-
-                    if data.type == "audio":
-                        # 🎧 Transcribe audio locally using Whisper
-                        transcribed_text = transcribe_audio(data.data)
-
-                        print("**************************")
-                        print(transcribed_text)
-
-                        # 🧠 Send transcription to Groq
-                        ai_response = analyze_sentiment(transcribed_text)
-
-                        response = {
-                            "request_id": request.request_id,
-                            "type": "audio",
-                            "transcription": transcribed_text, 
-                            "message": ai_response
-                        }
-
-                    elif data.type == "text":
-                        ai_response = analyze_sentiment(data.data)
-
-                        response = {
-                            "request_id": request.request_id,
-                            "type": "text",
-                            "message": ai_response
-                        }
-
-                    else:
-                        response = {
-                            "request_id": request.request_id,
-                            "error": "invalid request"
-                        }
-
-                    print("Request Received:", message_id)
-                    print("User:", data.user_id)
-                    print("Message:", data.data)
-                    print("AI Response:", response.get("message", "N/A"))
-                    print("-" * 40)
-
-                    client.publish_ack(ACK_CHANNEL, response)
-
-                except Exception as e:
-                    print(f"Error processing message: {e}")
-                    print("Raw message:", message_data)
-
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-
-    finally:
-        client.close()
-        print("Service stopped.")
-
-
+# ----------------------------
+# Start Redis loop
+# ----------------------------
 if __name__ == "__main__":
-    main()
+    start_redis_loop(
+        snn_model=snn_model,
+        tokenizer=tokenizer,
+        text_model=text_model,
+        smile=smile,
+        groq_fn=analyze_sentiment,
+        device=DEVICE
+    )
