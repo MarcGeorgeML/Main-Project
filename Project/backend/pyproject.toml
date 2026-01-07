@@ -10,6 +10,7 @@ dependencies = [
     "fastapi[standard]>=0.119.1",
     "google-auth>=2.42.0",
     "huggingface-hub>=0.36.0",
+    "minio>=7.2.20",
     "numpy>=2.3.4",
     "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.3",

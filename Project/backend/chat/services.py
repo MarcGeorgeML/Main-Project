@@ -2,18 +2,20 @@ from fastapi import HTTPException, UploadFile
 from pathlib import Path
 import shutil
 import subprocess
-
-
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from fastapi import UploadFile
 import uuid
 from typing import Optional, List
-
 from ..data.database import DbSession
 from ..entities.conversation import Conversation
 from ..entities.message import Message, SenderType, MessageType
 from sqlalchemy import func
+import tempfile
+from minio.error import S3Error
+from ..data.minio_client import minio_client, ensure_bucket
+import os
+
 
 
 def create_conversation(
@@ -152,39 +154,56 @@ def add_message_to_conversation(
 
 
 
-def save_and_convert_audio(audio: UploadFile, user_id: str, request_id: str) -> str:
-    # path to /temp directory
-    bucket_dir = Path(__file__).resolve().parent.parent.parent / "temp"
-    bucket_dir.mkdir(exist_ok=True)
 
-    # find file extension
-    extension = audio.content_type.split("/")[-1]
-    file_path = bucket_dir / f"{user_id}-{request_id}.{extension}"
+def save_and_convert_audio(
+    audio: UploadFile,
+    user_id: str,
+    request_id: str
+) -> str:
+    """
+    Converts uploaded audio to MP3 and uploads to MinIO.
+    Returns MinIO object name.
+    """
 
-    # reset file pointer and save
-    audio.file.seek(0)
-    with file_path.open("wb") as buffer:
-        shutil.copyfileobj(audio.file, buffer)
+    ensure_bucket()
 
-    # convert to mp3
-    mp3_path = file_path.with_suffix(".mp3")
+    # temp input file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".input") as tmp_in:
+        audio.file.seek(0)
+        tmp_in.write(audio.file.read())
+        input_path = tmp_in.name
 
-    result = subprocess.run([
-        "ffmpeg", "-y",
-        "-i", str(file_path),
-        str(mp3_path)
-    ], capture_output=True, text=True)
+    # temp output mp3
+    output_path = f"{input_path}.mp3"
+
+    # ffmpeg conversion
+    result = subprocess.run(
+        ["ffmpeg", "-y", "-i", input_path, output_path],
+        capture_output=True,
+        text=True
+    )
 
     if result.returncode != 0:
-        print("FFmpeg error:", result.stderr)
         raise HTTPException(
             status_code=500,
-            detail=f"FFmpeg conversion failed: {result.stderr}"
+            detail=f"FFmpeg failed: {result.stderr}"
         )
 
-    # delete original .webm file
-    file_path.unlink(missing_ok=True)
+    # MinIO object path
+    object_name = f"{user_id}/{request_id}.mp3"
 
-    print("audio converted")
+    try:
+        minio_client.fput_object(
+            bucket_name=os.getenv("MINIO_BUCKET", "audio"),
+            object_name=object_name,
+            file_path=output_path,
+            content_type="audio/mpeg"
+        )
+    except S3Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # cleanup temp files
+        os.remove(input_path)
+        os.remove(output_path)
 
-    return mp3_path
+    return object_name

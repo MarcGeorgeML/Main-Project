@@ -1,24 +1,32 @@
 import whisper
-import os
-from .resolve_audio_path import resolve_audio_path
+import tempfile
+from data.minio_client import minio_client, MINIO_BUCKET
 
 _model = whisper.load_model("base")
 
-ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(ENGINE_DIR, "..", ".."))
-AUDIO_BASE_DIR = os.path.join(PROJECT_ROOT, "temp")
-
-
-
-def transcribe_audio(audio_ref: str) -> str:
+def transcribe_audio(audio_object_key: str) -> str:
     """
-    Transcribe an audio file using local Whisper.
+    Download audio from MinIO and transcribe using Whisper.
     """
+    response = None
     try:
-        audio_path = resolve_audio_path(audio_ref)
-        result = _model.transcribe(audio_path)
-        return result.get("text", "").strip()
+        response = minio_client.get_object(
+            MINIO_BUCKET,
+            audio_object_key
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3") as tmp:
+            tmp.write(response.read())
+            tmp.flush()
+
+            result = _model.transcribe(tmp.name)
+            return result.get("text", "").strip()
 
     except Exception as e:
         print(f"Whisper transcription error: {e}")
         return ""
+
+    finally:
+        if response:
+            response.close()
+            response.release_conn()

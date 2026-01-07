@@ -46,18 +46,20 @@ export default function ChatClient() {
       try {
         const response = await getConversationMessages(chatId);
 
-        const normalizedMessages = response.data.messages.map(
-          (msg: Message) => {
+        const normalizedMessages = await Promise.all(
+          response.data.messages.map(async (msg: Message) => {
             if (msg.message_type === "AUDIO") {
+              const audioUrl = await getAudioUrl(msg.message);
               return {
                 ...msg,
-                message: getAudioUrl(msg.message),
+                message: audioUrl,
                 transcription: msg.transcription,
               };
             }
             return msg;
-          }
+          })
         );
+
 
         setMessages(normalizedMessages);
         setError(null);
@@ -219,15 +221,18 @@ export default function ChatClient() {
             response.data.user_message.message ||
             "";
 
+          const audioUrl = await getAudioUrl(filename);
+
           const userMsg: DisplayMessage = {
             id: response.data.user_message.id,
             sender: "USER",
             message_type: "AUDIO",
-            message: getAudioUrl(filename),
+            message: audioUrl,
             transcription: response.data.user_message.transcribed_message,
             emotion: response.data.user_message.emotion,
             created_at: response.data.user_message.created_at,
           };
+
           const aiMsg = convertMessageResponseToDisplay(
             response.data.ai_message,
             "AI",
@@ -238,6 +243,9 @@ export default function ChatClient() {
             const filtered = prev.filter((m) => m.id !== tempUserMsg.id);
             return [...filtered, userMsg, aiMsg];
           });
+
+          URL.revokeObjectURL(tempUserMsg.message);
+
 
           setError(null);
         } catch (err) {

@@ -7,6 +7,9 @@ from ..data.database import DbSession
 from ..data.redis_client import redis_client
 from .models import ChatRequest, JobMsgType, ConversationCreate, ConversationUpdate
 from . import services
+from ..data.minio_client import minio_client
+from datetime import timedelta
+
 
 chat_router = APIRouter(
     prefix='/chats',
@@ -63,6 +66,23 @@ async def get_all_conversations(
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching conversations: {str(e)}")
+
+
+@chat_router.get("/audio-url")
+async def get_audio_url(
+    object_key: str,
+    payload: TokenData = Depends(auth_middleware)
+):
+    try:
+        url = minio_client.presigned_get_object(
+            bucket_name="audio",
+            object_name=object_key,
+            expires=timedelta(hours=1)  
+        )
+        return {"url": url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @chat_router.delete("/{chat_id}")
@@ -224,19 +244,18 @@ async def send_audio_message(
     try:
         request_id = str(uuid.uuid4())
         
-        # Save and convert audio
-        mp3_filename = services.save_and_convert_audio(
+        minio_object_key = services.save_and_convert_audio(
             audio=audio,
-            user_id=payload.user_id,
+            user_id=str(payload.user_id),
             request_id=request_id
         )
-        
-        # Process with AI engine first to get transcription
+
         job_message = JobMsgType(
             user_id=payload.user_id,
             type="audio",
-            data=mp3_filename.name
+            data=minio_object_key
         )
+
         
         await redis_client.send_to_engine(request_id, job_message)
         response = await redis_client.wait_for_response(request_id)
@@ -248,7 +267,7 @@ async def send_audio_message(
             user_id=payload.user_id,
             sender="USER",
             message_type="AUDIO",
-            message=mp3_filename.name,
+            message=minio_object_key,
             transcription=response.get("transcription")  # Save transcription
         )
         
@@ -285,6 +304,7 @@ async def send_audio_message(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error sending audio message: {str(e)}")
+
 
 
 @chat_router.get("/test")

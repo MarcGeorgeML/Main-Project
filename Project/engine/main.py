@@ -6,7 +6,8 @@ from groq import Groq
 from dotenv import load_dotenv
 from snn.emotion_infer import infer_emotion
 from utils.whisper_transcriber import transcribe_audio 
-from utils.resolve_audio_path import resolve_audio_path
+import tempfile
+from data.minio_client import minio_client, MINIO_BUCKET
 
 # Load environment variables from .env file
 load_dotenv()
@@ -74,13 +75,20 @@ def main():
                     if data.type == "audio":
                         transcribed_text = transcribe_audio(data.data)
 
-                        audio_path = resolve_audio_path(data.data)
+                        minio_obj = minio_client.get_object(MINIO_BUCKET, data.data)
+                        try:
+                            with tempfile.NamedTemporaryFile(suffix=".mp3") as tmp:
+                                tmp.write(minio_obj.read())
+                                tmp.flush()
+                                #emotion_result = infer_emotion(tmp.name)
+                        finally:
+                            minio_obj.close()
+                            minio_obj.release_conn()
 
-                        emotion_result = infer_emotion(audio_path)
-
-                        emotion = emotion_result["prediction"]
-                        probs = emotion_result["probabilities"]
-
+                        # emotion = emotion_result["prediction"]
+                        # probs = emotion_result["probabilities"]
+                        emotion = "test"
+                        probs = "testing"
                         ai_response = analyze_sentiment(transcribed_text)
 
                         response = {

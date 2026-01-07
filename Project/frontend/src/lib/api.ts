@@ -138,9 +138,13 @@ export const sendAudioMessage = async (
 };
 
 // Get audio file URL
-export const getAudioUrl = (filename: string): string => {
-  return `${API_URL}/temp/${filename}`;
+export const getAudioUrl = async (objectKey: string): Promise<string> => {
+  const res = await api.get("/chats/audio-url", {
+    params: { object_key: objectKey },
+  });
+  return res.data.url;
 };
+
 
 
 // Get current user
