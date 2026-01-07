@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 import subprocess
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from fastapi import UploadFile
 import uuid
 from typing import Optional, List
@@ -15,7 +15,6 @@ import tempfile
 from minio.error import S3Error
 from ..data.minio_client import minio_client, ensure_bucket
 import os
-
 
 
 def create_conversation(
@@ -66,20 +65,45 @@ def get_all_conversations(
     return conversations
 
 
-def delete_conversation(db: DbSession, conversation_id: str, user_id: uuid.UUID) -> bool:
-    """Delete a conversation (only if it belongs to the user)"""
-    conversation = db.query(Conversation).filter(
-        Conversation.id == uuid.UUID(conversation_id),
-        Conversation.user_id == user_id
-    ).first()
-    
+
+def delete_conversation(
+    db: DbSession,
+    conversation_id: str,
+    user_id: uuid.UUID
+) -> bool:
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == uuid.UUID(conversation_id),
+            Conversation.user_id == user_id
+        )
+        .options(joinedload(Conversation.messages))
+        .first()
+    )
+
     if not conversation:
         return False
-    
+
+    # 1. Collect MinIO object keys
+    audio_objects = [
+        msg.message
+        for msg in conversation.messages
+        if msg.message_type.name == "AUDIO"
+    ]
+
+    # 2. Delete audio from MinIO
+    for object_key in audio_objects:
+        try:
+            minio_client.remove_object("audio", object_key)
+        except Exception as e:
+            # Log but DO NOT block DB delete
+            print(f"Failed to delete MinIO object {object_key}: {e}")
+
+    # 3. Delete DB conversation (messages cascade)
     db.delete(conversation)
     db.commit()
-    return True
 
+    return True
 
 def update_conversation_title(
     db: DbSession,
