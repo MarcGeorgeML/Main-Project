@@ -71,38 +71,50 @@ def main():
                     request = RequestType(**message_data)
                     data = request.data
 
-                    if data.type == "audio":
-                        transcribed_text = transcribe_audio(data.data)
+                    # if data.type == "audio":
+                    #     transcribed_text = transcribe_audio(data.data)
 
-                        audio_path = resolve_audio_path(data.data)
+                    #     audio_path = resolve_audio_path(data.data)
 
-                        emotion_result = infer_emotion(audio_path)
+                    #     emotion_result = infer_emotion(audio_path)
 
-                        emotion = emotion_result["prediction"]
-                        probs = emotion_result["probabilities"]
+                    #     emotion = emotion_result["prediction"]
+                    #     probs = emotion_result["probabilities"]
 
-                        ai_response = analyze_sentiment(transcribed_text)
+                    #     ai_response = analyze_sentiment(transcribed_text)
+
+                    #     response = {
+                    #         "request_id": request.request_id,
+                    #         "type": "audio",
+                    #         "transcription": transcribed_text,
+                    #         "emotion": emotion,
+                    #         "probabilities": probs,
+                    #         "message": f"{ai_response}"
+                    #     }
+
+
+
+                    # elif data.type == "text":
+                    #     ai_response = analyze_sentiment(data.data)
+
+                    #     response = {
+                    #         "request_id": request.request_id,
+                    #         "type": "text",
+                    #         "message": ai_response
+                    #     }
+
+                    if data.type == "video":
+                        print("-" * 60)
+                        print("got video")
+                        print("-" * 60)
 
                         response = {
                             "request_id": request.request_id,
-                            "type": "audio",
-                            "transcription": transcribed_text,
-                            "emotion": emotion,
-                            "probabilities": probs,
-                            "message": f"{ai_response}"
+                            "transcription": "This is a dummy test.",
+                            "emotion": "neutral",
+                            "confidence": 0.75,
+                            "message": "Thanks for sharing. I'm here to listen."
                         }
-
-
-
-                    elif data.type == "text":
-                        ai_response = analyze_sentiment(data.data)
-
-                        response = {
-                            "request_id": request.request_id,
-                            "type": "text",
-                            "message": ai_response
-                        }
-
                     else:
                         response = {
                             "request_id": request.request_id,

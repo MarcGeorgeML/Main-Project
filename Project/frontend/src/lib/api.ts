@@ -67,6 +67,9 @@ export const getChatHistory = async (): Promise<
   AxiosResponse<ChatHistoryResponse>
 > => fetchWithAuth<ChatHistoryResponse>("/chats");
 
+export const deleteChatHistory = async (): Promise<AxiosResponse<{ message: string }>> =>
+  api.delete("/chats");
+
 /**
  * Get user's current emotional state
  */

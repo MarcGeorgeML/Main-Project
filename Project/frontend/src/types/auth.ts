@@ -6,6 +6,7 @@ export interface Chat {
   id: string;
   video_url: string;
   transcription: string | null;
+  ai_response: string | null;        
   emotion: string | null;
   confidence: number | null;
   created_at: string;
@@ -14,6 +15,7 @@ export interface Chat {
 export interface ChatResponse {
   chat_id: string;
   transcription: string;
+  ai_response: string;              
   emotion: string;
   confidence: number;
   latest_emotional_state: string;

@@ -5,7 +5,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, delete  # ← add `delete` here
 from sqlalchemy.orm import Session
 
 from ..entities.chat import Chat
@@ -53,21 +53,27 @@ def create_chat_entry(
     transcription: str,
     detected_emotion: str,
     emotion_confidence: float,
+    ai_response: str,             
 ) -> Chat:
-    """Store processed chat"""
     chat = Chat(
         user_id=user_id,
         video_url=video_url,
         transcription=transcription,
         detected_emotion=detected_emotion,
         emotion_confidence=emotion_confidence,
-        latest_emotional_state=detected_emotion,  # update state
+        latest_emotional_state=detected_emotion,
+        ai_response=ai_response,  
     )
-
     db.add(chat)
     db.commit()
     db.refresh(chat)
     return chat
+
+def delete_all_chats(db: Session, user_id: uuid.UUID) -> None:
+    """Delete all chats for a user"""
+    stmt = delete(Chat).where(Chat.user_id == user_id)
+    db.execute(stmt)
+    db.commit()
 
 
 def get_all_chats(db: Session, user_id: uuid.UUID) -> List[Chat]:

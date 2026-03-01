@@ -14,6 +14,7 @@ class RequestData(BaseModel):
     user_id: str
     type: str
     data: str
+    latest_emotion: str | None = None
 
 
 class RequestType(BaseModel):

@@ -22,3 +22,4 @@ class JobMsgType(BaseModel):
     user_id: str
     type: str
     data: str
+    latest_emotion: str
