@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import LogoutButton from "@/components/ui/button/LogoutButton";
 import { User } from "@/types/auth";
 
@@ -25,20 +26,30 @@ export default function Navbar({ showClose = false, user }: NavbarProps) {
                 aria-label="Go to home"
               >
                 <svg
-                  className="w-5 h-5 text-gray-600"
+                  className="w-5 h-5 text-gray-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
 
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm">SC</span>
-              </div>
+            {/* Logo from /public/logo.png */}
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/logo2.png"
+                alt="SentiCore logo"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
               <h1 className="text-xl font-bold text-purple-600">SentiCore</h1>
             </div>
           </div>
@@ -58,3 +69,7 @@ export default function Navbar({ showClose = false, user }: NavbarProps) {
     </nav>
   );
 }
+
+
+
+
