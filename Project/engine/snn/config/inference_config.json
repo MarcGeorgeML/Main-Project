@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "run_id": "8fa0157a2e664559a4d9694f0a3ef59d",
+    "run_name": "SpikEmo_T8_dim256_h4_lr4.9334886565290195e-05_bs32_20260320_132547"
+  },
+  "T": 8,
+  "tau": 10.0,
+  "common_thr": 1.0,
+  "model_dim": 256,
+  "hidden_dim": 1024,
+  "num_layers": 6,
+  "num_heads": 4,
+  "n_classes": 6,
+  "depths": 2,
+  "heads": 8,
+  "qk_scale": 0.125,
+  "dataset": "custom",
+  "multi_attn_flag": true,
+  "roberta_dim": 768,
+  "D_m_audio": 768,
+  "D_m_visual": 2048,
+  "dropout": 0
+}

@@ -3,7 +3,6 @@ sys.path.append("..")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-print(torch.__version__)
 from spikingjelly.activation_based import surrogate
 from spikingjelly.activation_based import neuron
 import numpy as np
@@ -95,10 +94,14 @@ class spiking_self_attention(nn.Module):
 
 
 class mlp(nn.Module):
-    def __init__(self, tau, common_thr, in_features, hidden_features=None, out_features=None, ):
+    def __init__(self, tau: float, common_thr: float, in_features: int, hidden_features: int | None = None, out_features: int | None = None) -> None:
         super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features
+        
+        if hidden_features is None:
+            hidden_features = in_features
+        if out_features is None:
+            out_features = in_features
+            
         self.in_features = in_features
         self.hidden_features = hidden_features
         self.out_features = out_features
@@ -182,7 +185,8 @@ class Spikformer(nn.Module):
         # L B D
         # print(x.shape)
         x = x.transpose(0, 1) # B L D
-        x = x.repeat(tuple([self.T] + torch.ones(len(x.size()), dtype=int).tolist())) # T B L D
+        x = x.unsqueeze(0) # 1 B L D
+        x = x.repeat(self.T, 1, 1, 1) # T B L D
         x = x.transpose(0, 1) # B T L D
         x = self.atan(x)
         for i, blk in enumerate(self.blocks):

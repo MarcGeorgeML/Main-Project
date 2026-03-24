@@ -1,8 +1,4 @@
 import torch.nn as nn
-
-
-
-
 '''
 2-layer MLP with ReLU activation.
 '''

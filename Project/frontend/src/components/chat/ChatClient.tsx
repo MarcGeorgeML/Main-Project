@@ -29,6 +29,25 @@ function getEmotionConfig(emotion?: string | null) {
   return EMOTION_CONFIG[emotion.toLowerCase()] ?? EMOTION_CONFIG["neutral"];
 }
 
+/**
+ * Pick the best available MIME type for MediaRecorder.
+ * Prefers codecs that survive the backend's ffmpeg transcode most cleanly.
+ * The backend will always transcode to H264/AAC MP4 regardless, so this is
+ * just a best-effort to send a higher-quality source stream.
+ */
+function getBestMimeType(): string {
+  const candidates = [
+    "video/mp4",                        // Safari 14.1+
+    "video/webm;codecs=h264,opus",      // Chrome with H264 hardware encoder
+    "video/webm;codecs=vp8,opus",       // Universal fallback
+    "video/webm",                       // Last resort
+  ];
+  for (const type of candidates) {
+    if (MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return "";  // let the browser decide
+}
+
 // ─── Emotion Badge + Record Button ───────────────────────────────────────────
 
 function RecordButton({
@@ -36,11 +55,13 @@ function RecordButton({
   isLoading,
   currentEmotion,
   onToggle,
+  onLabelClick,
 }: {
   isRecording: boolean;
   isLoading: boolean;
   currentEmotion: string | null;
   onToggle: () => void;
+  onLabelClick: () => void;
 }) {
   const cfg = getEmotionConfig(currentEmotion);
 
@@ -124,7 +145,11 @@ function RecordButton({
         </button>
       </div>
 
-      <p className="text-xs text-gray-400 tracking-wide">
+      {/* Clicking this label triggers the hidden file input */}
+      <p
+        onClick={!isRecording && !isLoading ? onLabelClick : undefined}
+        className="text-xs text-gray-400 tracking-wide select-none"
+      >
         {isLoading
           ? "Processing…"
           : isRecording
@@ -219,6 +244,7 @@ export default function ChatClient() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const videoChunksRef = useRef<Blob[]>([]);
+  const hiddenFileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -240,7 +266,6 @@ export default function ChatClient() {
 
         const chats: Chat[] = historyRes.data;
 
-        // Build flat list: user message then AI message per chat entry
         const display: DisplayMessage[] = chats.flatMap((chat) => {
           const msgs: DisplayMessage[] = [];
 
@@ -292,9 +317,11 @@ export default function ChatClient() {
         audio: true,
       });
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "video/webm;codecs=vp8,opus",
-      });
+      const mimeType = getBestMimeType();
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
       mediaRecorderRef.current = mediaRecorder;
       videoChunksRef.current = [];
 
@@ -303,52 +330,15 @@ export default function ChatClient() {
       };
 
       mediaRecorder.onstop = async () => {
-        // Stop all camera/mic tracks immediately
         stream.getTracks().forEach((t) => t.stop());
 
-        const videoBlob = new Blob(videoChunksRef.current, { type: "video/webm" });
-
-        setIsLoading(true);
-        try {
-          const response = await sendVideoChat(videoBlob);
-          const data: ChatResponse = response.data;
-
-          const userMsg: DisplayMessage = {
-            id: `user-${data.chat_id}`,
-            sender: "USER",
-            text: data.transcription || "(no speech detected)",
-            emotion: data.emotion,
-            confidence: data.confidence,
-            created_at: data.created_at,
-          };
-
-          const aiMsg: DisplayMessage = {
-            id: `ai-${data.chat_id}`,
-            sender: "AI",
-            text: data.ai_response || "",
-            created_at: data.created_at,
-          };
-
-          setMessages((prev) => [...prev, userMsg, aiMsg]);
-
-          // Update ambient emotion indicator
-          if (data.latest_emotional_state) {
-            setCurrentEmotion(data.latest_emotional_state);
-          } else if (data.emotion) {
-            setCurrentEmotion(data.emotion);
-          }
-
-          setError(null);
-        } catch (err) {
-          const axErr = err as AxiosError;
-          console.error("Error sending video:", axErr);
-          setError("Failed to process recording. Please try again.");
-        } finally {
-          setIsLoading(false);
-        }
+        // Use the actual mimeType from the recorder (may differ from requested)
+        const actualMime = mediaRecorder.mimeType || "video/webm";
+        const videoBlob = new Blob(videoChunksRef.current, { type: actualMime });
+        await processAndSendVideo(videoBlob);
       };
 
-      mediaRecorder.start(250); // collect a chunk every 250 ms
+      mediaRecorder.start(250);
       setIsRecording(true);
     } catch (err) {
       console.error("Camera/microphone access denied:", err);
@@ -365,6 +355,61 @@ export default function ChatClient() {
     if (isLoading) return;
     if (isRecording) stopRecording();
     else startRecording();
+  };
+
+  // ── Shared video-send logic ────────────────────────────────────────────────
+
+  const processAndSendVideo = async (videoBlob: Blob) => {
+    setIsLoading(true);
+    try {
+      const response = await sendVideoChat(videoBlob);
+      const data: ChatResponse = response.data;
+
+      const userMsg: DisplayMessage = {
+        id: `user-${data.chat_id}`,
+        sender: "USER",
+        text: data.transcription || "(no speech detected)",
+        emotion: data.emotion,
+        confidence: data.confidence,
+        created_at: data.created_at,
+      };
+
+      const aiMsg: DisplayMessage = {
+        id: `ai-${data.chat_id}`,
+        sender: "AI",
+        text: data.ai_response || "",
+        created_at: data.created_at,
+      };
+
+      setMessages((prev) => [...prev, userMsg, aiMsg]);
+
+      if (data.latest_emotional_state) {
+        setCurrentEmotion(data.latest_emotional_state);
+      } else if (data.emotion) {
+        setCurrentEmotion(data.emotion);
+      }
+
+      setError(null);
+    } catch (err) {
+      const axErr = err as AxiosError;
+      console.error("Error sending video:", axErr);
+      setError("Failed to process recording. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ── Hidden file upload ─────────────────────────────────────────────────────
+
+  const handleLabelClick = () => {
+    hiddenFileInputRef.current?.click();
+  };
+
+  const handleHiddenFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    await processAndSendVideo(file);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -395,6 +440,15 @@ export default function ChatClient() {
 
   return (
     <div className="relative flex flex-col h-full">
+      {/* Hidden file input — completely invisible, no UI trace */}
+      <input
+        ref={hiddenFileInputRef}
+        type="file"
+        accept="video/mp4,video/*"
+        className="hidden"
+        onChange={handleHiddenFileChange}
+      />
+
       {/* ── Clear history button ── */}
       {messages.length > 0 && (
         <div className="absolute top-4 right-4 z-10">
@@ -417,7 +471,6 @@ export default function ChatClient() {
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
         <div className="max-w-2xl mx-auto space-y-4">
 
-          {/* Empty state */}
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
               <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center">
@@ -443,7 +496,6 @@ export default function ChatClient() {
             <MessageBubble key={msg.id} message={msg} />
           ))}
 
-          {/* Processing / thinking indicator */}
           {isLoading && (
             <div className="flex items-end gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex-shrink-0 flex items-center justify-center shadow-md">
@@ -498,6 +550,7 @@ export default function ChatClient() {
           isLoading={isLoading}
           currentEmotion={currentEmotion}
           onToggle={handleToggleRecording}
+          onLabelClick={handleLabelClick}
         />
       </div>
 

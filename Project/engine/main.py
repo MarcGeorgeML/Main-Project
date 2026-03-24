@@ -2,59 +2,44 @@ from data.redis_client import RedisClient
 from schemas.requests import RequestType
 import json
 import os
-from groq import Groq
+import sys
 from dotenv import load_dotenv
-from snn.emotion_infer import infer_emotion
-from utils.whisper_transcriber import transcribe_audio 
-from utils.resolve_audio_path import resolve_audio_path
 
-# Load environment variables from .env file
 load_dotenv()
+
+# ── Add snn/inference to path so pipeline imports work ──────────────────────
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "snn", "inference"))
+
+from snn.inference.pipeline import InferencePipeline
 
 ACK_CHANNEL = "ack_channel"
 JOB_STREAM = "job"
 
-# Initialize Groq client
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+CONFIG_PATH  = os.path.join(os.path.dirname(__file__), "snn", "config", "inference_config.json")
+WEIGHTS_PATH = os.path.join(os.path.dirname(__file__), "snn", "inference", "senticore-model.pt")
 
-def analyze_sentiment(text):
-    """
-    Analyze the emotional sentiment of the text using Groq API.
-    Returns a short response message.
-    """
-    try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an emotional sentiment analysis chatbot. "
-                        "Analyze the user's message and respond with a short, "
-                        "empathetic message (1-2 sentences) that acknowledges "
-                        "their emotional state and provides supportive feedback."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ],
-            model="llama-3.1-8b-instant",
-            temperature=0.7,
-            max_tokens=100
-        )
 
-        return chat_completion.choices[0].message.content
-
-    except Exception as e:
-        print(f"Error calling Groq API: {e}")
-        return "I'm having trouble analyzing that right now. Please try again."
+def load_config(path: str) -> dict:
+    with open(path, "r") as f:
+        cfg = json.load(f)
+    cfg.pop("_meta", None)
+    return cfg
 
 
 def main():
     print("\n=================================")
     print("Starting Senticore Engine...")
     print("=================================\n")
+
+    # ── Load model once at startup ───────────────────────────────────────────
+    print("[main] Loading inference pipeline...")
+    model_config = load_config(CONFIG_PATH)
+    pipeline = InferencePipeline(
+        model_config=model_config,
+        weights_path=WEIGHTS_PATH,
+        whisper_model_size="base",
+    )
+    print("[main] Pipeline ready.\n")
 
     client = RedisClient()
     client.clear_stream(JOB_STREAM)
@@ -71,67 +56,45 @@ def main():
                     request = RequestType(**message_data)
                     data = request.data
 
-                    # if data.type == "audio":
-                    #     transcribed_text = transcribe_audio(data.data)
-
-                    #     audio_path = resolve_audio_path(data.data)
-
-                    #     emotion_result = infer_emotion(audio_path)
-
-                    #     emotion = emotion_result["prediction"]
-                    #     probs = emotion_result["probabilities"]
-
-                    #     ai_response = analyze_sentiment(transcribed_text)
-
-                    #     response = {
-                    #         "request_id": request.request_id,
-                    #         "type": "audio",
-                    #         "transcription": transcribed_text,
-                    #         "emotion": emotion,
-                    #         "probabilities": probs,
-                    #         "message": f"{ai_response}"
-                    #     }
-
-
-
-                    # elif data.type == "text":
-                    #     ai_response = analyze_sentiment(data.data)
-
-                    #     response = {
-                    #         "request_id": request.request_id,
-                    #         "type": "text",
-                    #         "message": ai_response
-                    #     }
-
                     if data.type == "video":
                         print("-" * 60)
-                        print("got video")
-                        print("-" * 60)
+                        video_path = data.data
+                        print(f"[main] Processing video: {video_path}")
+
+                        results = pipeline.predict(video_path)
+
+                        # Use the highest-confidence utterance as the overall prediction
+                        best = max(results, key=lambda r: r.confidence)
 
                         response = {
                             "request_id": request.request_id,
-                            "transcription": "This is a dummy test.",
-                            "emotion": "neutral",
-                            "confidence": 0.75,
+                            "emotion":     best.emotion,
+                            "confidence":  round(best.confidence, 4),
+                            "transcription": best.text,
+                            "all_scores":  best.all_scores,
                             "message": "Thanks for sharing. I'm here to listen."
                         }
+
                     else:
                         response = {
                             "request_id": request.request_id,
-                            "error": "invalid request"
+                            "error": "invalid request type"
                         }
 
-                    print("Request Received:", message_id)
-                    print("User:", data.user_id)
-                    print("Message:", data.data)
-                    print("AI Response:", response.get("message", "N/A"))
-                    print("-" * 40)
+                    print("Request ID :", request.request_id)
+                    print("User       :", data.user_id)
+                    print("Emotion    :", response.get("emotion", "N/A"))
+                    print("Confidence :", response.get("confidence", "N/A"))
+                    print("-" * 60)
 
                     client.publish_ack(ACK_CHANNEL, response)
 
                 except Exception as e:
-                    print(f"Error processing message: {e}")
-                    print("Raw message:", message_data)
+                    print(f"[main] Error processing message {message_id}: {e}")
+                    client.publish_ack(ACK_CHANNEL, {
+                        "request_id": message_data.get("request_id", "unknown"),
+                        "error": str(e)
+                    })
 
     except KeyboardInterrupt:
         print("\nShutting down...")
