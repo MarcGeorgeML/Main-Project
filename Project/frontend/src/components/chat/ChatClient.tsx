@@ -477,13 +477,13 @@ export default function ChatClient() {
         style={{
           height: "75%",
           background:
-            "radial-gradient(ellipse 80% 60% at 50% 100%, rgba(139,92,246,0.18) 0%, rgba(217,70,239,0.12) 30%, rgba(139,92,246,0.06) 60%, transparent 100%)",
+            "radial-gradient(ellipse 80% 60% at 50% 100%, rgba(139,92,246,0.30) 0%, rgba(217,70,239,0.20) 30%, rgba(139,92,246,0.10) 60%, transparent 100%)",
         }}
       />
 
       {/* Clear history button */}
       {messages.length > 0 && (
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-4 z-50">
           <button
             onClick={handleClearHistory}
             title="Clear chat history"
@@ -504,7 +504,7 @@ export default function ChatClient() {
 
       {/* Messages */}
       <div className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-8 py-6">
-        <div className="max-w-2xl mx-auto space-y-4">
+        <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
               <div
@@ -545,7 +545,7 @@ export default function ChatClient() {
             <div className="flex items-end gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/ai-chat.png"
+                src="/ai-chat3.png"
                 alt="AI"
                 className="w-8 h-8 rounded-full flex-shrink-0 object-cover shadow-sm"
               />
