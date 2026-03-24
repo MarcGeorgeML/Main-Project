@@ -14,14 +14,14 @@ interface DisplayMessage {
   created_at: string;
 }
 
-const EMOTION_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
-  happy:     { color: "text-amber-600",  bg: "bg-amber-50 border-amber-200",   icon: "😊" },
-  sad:       { color: "text-blue-500",   bg: "bg-blue-50 border-blue-200",     icon: "😔" },
-  angry:     { color: "text-red-500",    bg: "bg-red-50 border-red-200",       icon: "😠" },
-  fearful:   { color: "text-violet-500", bg: "bg-violet-50 border-violet-200", icon: "😨" },
-  disgusted: { color: "text-green-600",  bg: "bg-green-50 border-green-200",   icon: "😒" },
-  surprised: { color: "text-orange-500", bg: "bg-orange-50 border-orange-200", icon: "😲" },
-  neutral:   { color: "text-slate-500",  bg: "bg-slate-50 border-slate-200",   icon: "😐" },
+const EMOTION_CONFIG: Record<string, { color: string; bg: string; icon: string; dot: string }> = {
+  happy:     { color: "text-amber-600",  bg: "bg-amber-50 border-amber-200",   icon: "😊", dot: "#D97706" },
+  sad:       { color: "text-blue-500",   bg: "bg-blue-50 border-blue-200",     icon: "😔", dot: "#3B82F6" },
+  angry:     { color: "text-red-500",    bg: "bg-red-50 border-red-200",       icon: "😠", dot: "#EF4444" },
+  fearful:   { color: "text-violet-500", bg: "bg-violet-50 border-violet-200", icon: "😨", dot: "#8B5CF6" },
+  disgusted: { color: "text-green-600",  bg: "bg-green-50 border-green-200",   icon: "😒", dot: "#16A34A" },
+  surprised: { color: "text-orange-500", bg: "bg-orange-50 border-orange-200", icon: "😲", dot: "#F97316" },
+  neutral:   { color: "text-slate-500",  bg: "bg-slate-50 border-slate-200",   icon: "😐", dot: "#94A3B8" },
 };
 
 function getEmotionConfig(emotion?: string | null) {
@@ -29,26 +29,70 @@ function getEmotionConfig(emotion?: string | null) {
   return EMOTION_CONFIG[emotion.toLowerCase()] ?? EMOTION_CONFIG["neutral"];
 }
 
-/**
- * Pick the best available MIME type for MediaRecorder.
- * Prefers codecs that survive the backend's ffmpeg transcode most cleanly.
- * The backend will always transcode to H264/AAC MP4 regardless, so this is
- * just a best-effort to send a higher-quality source stream.
- */
 function getBestMimeType(): string {
   const candidates = [
-    "video/mp4",                        // Safari 14.1+
-    "video/webm;codecs=h264,opus",      // Chrome with H264 hardware encoder
-    "video/webm;codecs=vp8,opus",       // Universal fallback
-    "video/webm",                       // Last resort
+    "video/mp4",
+    "video/webm;codecs=h264,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
   ];
   for (const type of candidates) {
     if (MediaRecorder.isTypeSupported(type)) return type;
   }
-  return "";  // let the browser decide
+  return "";
 }
 
-// ─── Emotion Badge + Record Button ───────────────────────────────────────────
+// ─── Emotion Dot Indicator ────────────────────────────────────────────────────
+
+function EmotionDot({
+  emotion,
+  confidence,
+}: {
+  emotion?: string | null;
+  confidence?: number | null;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const cfg = getEmotionConfig(emotion);
+
+  if (!emotion) return null;
+
+  return (
+    <div
+      className="relative flex items-center justify-center"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span
+        className="block w-2.5 h-2.5 rounded-full cursor-pointer ring-2 ring-white shadow-sm transition-transform duration-200 hover:scale-125"
+        style={{ backgroundColor: cfg.dot }}
+      />
+      {hovered && (
+        <div
+          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+            px-2.5 py-1.5 rounded-lg text-xs font-medium text-white whitespace-nowrap shadow-lg
+            transition-all duration-200 opacity-100"
+          style={{
+            background: "rgba(15,15,20,0.88)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <span className="mr-1">{cfg.icon}</span>
+          <span className="capitalize">{emotion}</span>
+          {confidence != null && (
+            <span className="ml-1 opacity-70">{Math.round(confidence * 100)}%</span>
+          )}
+          {/* Arrow */}
+          <span
+            className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent"
+            style={{ borderTopColor: "rgba(15,15,20,0.88)" }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Record Button ────────────────────────────────────────────────────────────
 
 function RecordButton({
   isRecording,
@@ -63,36 +107,59 @@ function RecordButton({
   onToggle: () => void;
   onLabelClick: () => void;
 }) {
+  const [labelHovered, setLabelHovered] = useState(false);
   const cfg = getEmotionConfig(currentEmotion);
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Emotion badge */}
+      {/* Emotion indicator row */}
       <div
-        className={`
-          flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-semibold
-          transition-all duration-500 backdrop-blur-sm
-          ${currentEmotion
-            ? `${cfg.bg} ${cfg.color}`
-            : "bg-white/80 border-gray-200 text-gray-400"
-          }
-        `}
+        className="flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-semibold
+          transition-all duration-500 bg-white/70 backdrop-blur-sm border-white/60 shadow-sm"
+        onMouseEnter={() => setLabelHovered(true)}
+        onMouseLeave={() => setLabelHovered(false)}
+        style={{ cursor: currentEmotion ? "default" : "default" }}
       >
         {currentEmotion ? (
-          <>
-            <span className="text-sm">{cfg.icon}</span>
-            <span className="capitalize tracking-wide">{currentEmotion}</span>
-            <span className="opacity-50">detected</span>
-          </>
+          <div className="relative flex items-center gap-2">
+            {/* Dot indicator */}
+            <span
+              className="block w-2 h-2 rounded-full ring-2 ring-white/80 transition-transform duration-200"
+              style={{
+                backgroundColor: cfg.dot,
+                transform: labelHovered ? "scale(1.4)" : "scale(1)",
+              }}
+            />
+            <span className={`capitalize tracking-wide ${cfg.color}`}>{currentEmotion}</span>
+            <span className="text-gray-400">detected</span>
+
+            {/* Hover tooltip */}
+            {labelHovered && (
+              <div
+                className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+                  px-2.5 py-1.5 rounded-lg text-xs font-medium text-white whitespace-nowrap shadow-lg"
+                style={{
+                  background: "rgba(15,15,20,0.88)",
+                  backdropFilter: "blur(6px)",
+                }}
+              >
+                <span className="mr-1">{cfg.icon}</span>
+                <span className="capitalize">{currentEmotion}</span>
+                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent"
+                  style={{ borderTopColor: "rgba(15,15,20,0.88)" }}
+                />
+              </div>
+            )}
+          </div>
         ) : (
           <>
             <span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block" />
-            <span>no emotion detected yet</span>
+            <span className="text-gray-400">no emotion detected yet</span>
           </>
         )}
       </div>
 
-      {/* Button with pulse rings */}
+      {/* Button */}
       <div className="relative flex items-center justify-center">
         {isRecording && (
           <>
@@ -104,13 +171,6 @@ function RecordButton({
           </>
         )}
 
-        {/* Ambient glow from emotion colour */}
-        {currentEmotion && !isRecording && (
-          <span
-            className={`absolute w-28 h-28 rounded-full opacity-30 blur-xl transition-all duration-1000 ${cfg.bg.split(" ")[0]}`}
-          />
-        )}
-
         <button
           onClick={onToggle}
           disabled={isLoading}
@@ -119,21 +179,39 @@ function RecordButton({
             transition-all duration-300 cursor-pointer
             shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95
             disabled:opacity-50 disabled:cursor-not-allowed
-            ${isRecording ? "bg-red-500 hover:bg-red-600" : "bg-purple-600 hover:bg-purple-700"}
+            ${isRecording
+              ? "bg-red-500 hover:bg-red-600"
+              : "bg-white hover:bg-gray-50 border border-white/80"
+            }
           `}
+          style={!isRecording ? { boxShadow: "0 4px 24px rgba(139,92,246,0.25), 0 2px 8px rgba(0,0,0,0.08)" } : {}}
           aria-label={isRecording ? "Stop recording" : "Start recording"}
         >
           {isLoading ? (
-            <svg className="w-7 h-7 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="w-7 h-7 animate-spin" fill="none" viewBox="0 0 24 24"
+              style={{ stroke: "url(#btnGrad)" }}>
+              <defs>
+                <linearGradient id="btnGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#8B5CF6" />
+                  <stop offset="100%" stopColor="#D946EF" />
+                </linearGradient>
+              </defs>
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"
+                style={{ fill: "#8B5CF6" }} />
             </svg>
           ) : isRecording ? (
             <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
               <rect x="6" y="6" width="12" height="12" rx="2.5" />
             </svg>
           ) : (
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-8 h-8" fill="none" stroke="url(#micGrad)" viewBox="0 0 24 24">
+              <defs>
+                <linearGradient id="micGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#8B5CF6" />
+                  <stop offset="100%" stopColor="#D946EF" />
+                </linearGradient>
+              </defs>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -145,10 +223,9 @@ function RecordButton({
         </button>
       </div>
 
-      {/* Clicking this label triggers the hidden file input */}
       <p
         onClick={!isRecording && !isLoading ? onLabelClick : undefined}
-        className="text-xs text-gray-400 tracking-wide select-none"
+        className="text-xs text-gray-400/80 tracking-wide select-none"
       >
         {isLoading
           ? "Processing…"
@@ -164,7 +241,6 @@ function RecordButton({
 
 function MessageBubble({ message }: { message: DisplayMessage }) {
   const isUser = message.sender === "USER";
-  const cfg = getEmotionConfig(message.emotion);
 
   return (
     <div
@@ -173,7 +249,10 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
     >
       {/* AI avatar */}
       {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex-shrink-0 flex items-center justify-center shadow-md">
+        <div
+          className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center shadow-md"
+          style={{ background: "linear-gradient(135deg, #8B5CF6, #D946EF)" }}
+        >
           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -186,29 +265,26 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
       )}
 
       <div className={`flex flex-col gap-1 max-w-sm ${isUser ? "items-end" : "items-start"}`}>
-        {/* Emotion chip — only on user messages */}
-        {isUser && message.emotion && (
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium ${cfg.bg} ${cfg.color}`}
-          >
-            <span>{cfg.icon}</span>
-            <span className="capitalize">{message.emotion}</span>
-            {message.confidence != null && (
-              <span className="opacity-50">{Math.round(message.confidence * 100)}%</span>
-            )}
-          </div>
-        )}
-
         <div
           className={`
-            px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm
+            px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm relative
             ${isUser
-              ? "bg-purple-600 text-white rounded-br-sm"
+              ? "text-white rounded-br-sm"
               : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm"
             }
           `}
+          style={isUser ? {
+            background: "linear-gradient(to right, #8B5CF6, #D946EF)",
+          } : {}}
         >
           {message.text}
+
+          {/* Emotion dot — on user messages, shown inside bottom-right corner area */}
+          {isUser && message.emotion && (
+            <span className="absolute -bottom-1 -left-1">
+              <EmotionDot emotion={message.emotion} confidence={message.confidence} />
+            </span>
+          )}
         </div>
 
         <span className="text-[10px] text-gray-400 px-1">
@@ -254,7 +330,6 @@ export default function ChatClient() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Load history + current emotion on mount
   useEffect(() => {
     const loadHistory = async () => {
       setIsFetching(true);
@@ -308,8 +383,6 @@ export default function ChatClient() {
     loadHistory();
   }, []);
 
-  // ── Recording ──────────────────────────────────────────────────────────────
-
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -331,8 +404,6 @@ export default function ChatClient() {
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-
-        // Use the actual mimeType from the recorder (may differ from requested)
         const actualMime = mediaRecorder.mimeType || "video/webm";
         const videoBlob = new Blob(videoChunksRef.current, { type: actualMime });
         await processAndSendVideo(videoBlob);
@@ -356,8 +427,6 @@ export default function ChatClient() {
     if (isRecording) stopRecording();
     else startRecording();
   };
-
-  // ── Shared video-send logic ────────────────────────────────────────────────
 
   const processAndSendVideo = async (videoBlob: Blob) => {
     setIsLoading(true);
@@ -399,8 +468,6 @@ export default function ChatClient() {
     }
   };
 
-  // ── Hidden file upload ─────────────────────────────────────────────────────
-
   const handleLabelClick = () => {
     hiddenFileInputRef.current?.click();
   };
@@ -412,13 +479,14 @@ export default function ChatClient() {
     await processAndSendVideo(file);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   if (isFetching) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+          <div
+            className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: "#8B5CF6", borderTopColor: "transparent" }}
+          />
           <p className="text-sm text-gray-400">Loading your conversations…</p>
         </div>
       </div>
@@ -439,14 +507,23 @@ export default function ChatClient() {
   };
 
   return (
-    <div className="relative flex flex-col h-full">
-      {/* Hidden file input — completely invisible, no UI trace */}
+    <div className="relative flex flex-col h-full w-full overflow-hidden">
+      {/* Hidden file input */}
       <input
         ref={hiddenFileInputRef}
         type="file"
         accept="video/mp4,video/*"
         className="hidden"
         onChange={handleHiddenFileChange}
+      />
+
+      {/* ── Radial gradient background at bottom ── */}
+      <div
+        className="pointer-events-none absolute bottom-0 left-0 right-0 z-0"
+        style={{
+          height: "75%",
+          background: `radial-gradient(ellipse 80% 60% at 50% 100%, rgba(139,92,246,0.18) 0%, rgba(217,70,239,0.12) 30%, rgba(139,92,246,0.06) 60%, transparent 100%)`,
+        }}
       />
 
       {/* ── Clear history button ── */}
@@ -468,13 +545,22 @@ export default function ChatClient() {
       )}
 
       {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
+      <div className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-8 py-6">
         <div className="max-w-2xl mx-auto space-y-4">
 
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-              <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center">
-                <svg className="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(217,70,239,0.15))" }}
+              >
+                <svg className="w-8 h-8" fill="none" stroke="url(#emptyGrad)" viewBox="0 0 24 24">
+                  <defs>
+                    <linearGradient id="emptyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#8B5CF6" />
+                      <stop offset="100%" stopColor="#D946EF" />
+                    </linearGradient>
+                  </defs>
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -498,27 +584,20 @@ export default function ChatClient() {
 
           {isLoading && (
             <div className="flex items-end gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex-shrink-0 flex items-center justify-center shadow-md">
+              <div
+                className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center shadow-md"
+                style={{ background: "linear-gradient(135deg, #8B5CF6, #D946EF)" }}
+              >
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M14.25 3.104c.251.023.501.05.75.082M19.8 15l-1.57.393A9.065 9.065 0 0112 15"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M14.25 3.104c.251.023.501.05.75.082M19.8 15l-1.57.393A9.065 9.065 0 0112 15" />
                 </svg>
               </div>
               <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
                 <div className="flex gap-1.5 items-center">
-                  <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" />
-                  <span
-                    className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.15s" }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.3s" }}
-                  />
+                  <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: "#8B5CF6" }} />
+                  <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: "#A855F7", animationDelay: "0.15s" }} />
+                  <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: "#D946EF", animationDelay: "0.3s" }} />
                 </div>
               </div>
             </div>
@@ -530,7 +609,7 @@ export default function ChatClient() {
 
       {/* ── Error banner ── */}
       {error && (
-        <div className="mx-4 sm:mx-8 mb-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between">
+        <div className="relative z-10 mx-4 sm:mx-8 mb-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between">
           <p className="text-sm text-red-600">{error}</p>
           <button
             onClick={() => setError(null)}
@@ -544,7 +623,7 @@ export default function ChatClient() {
       )}
 
       {/* ── Record button ── */}
-      <div className="flex-shrink-0 pb-8 pt-4 flex flex-col items-center bg-gradient-to-t from-white via-white/90 to-transparent">
+      <div className="relative z-10 flex-shrink-0 pb-8 pt-4 flex flex-col items-center">
         <RecordButton
           isRecording={isRecording}
           isLoading={isLoading}
