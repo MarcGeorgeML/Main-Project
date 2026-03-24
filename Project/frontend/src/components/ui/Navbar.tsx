@@ -44,13 +44,13 @@ export default function Navbar({ showClose = false, user }: NavbarProps) {
             {/* Logo from /public/logo.png */}
             <div className="flex items-center gap-2.5">
               <Image
-                src="/logo2.png"
+                src="/logo3.png"
                 alt="SentiCore logo"
                 width={32}
                 height={32}
                 className="object-contain"
               />
-              <h1 className="text-xl font-bold text-purple-600">SentiCore</h1>
+              <h1 className="text-xl font-bold text-purple-800 font-[family-name:var(--font-manrope)]">SentiCore</h1>
             </div>
           </div>
 

@@ -123,26 +123,34 @@ function RecordButton({
   onToggle: () => void;
   onLabelClick: () => void;
 }) {
+  const [emotionTagVisible, setEmotionTagVisible] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cfg = getEmotionConfig(currentEmotion);
+
+  const handleMouseEnter = () => {
+    hoverTimerRef.current = setTimeout(() => setEmotionTagVisible(true), 2000);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setEmotionTagVisible(false);
+  };
+
   return (
     <div className="flex items-center gap-5">
-      {/* Emotion indicator dot — bigger, to the left of the button */}
-      <div className="flex items-center justify-center w-8">
-        {currentEmotion ? (
-          <EmotionTooltip emotion={currentEmotion} confidence={null}>
-            <span
-              className="block w-5 h-5 rounded-full cursor-default ring-2 ring-white/80 shadow-md
-                transition-transform duration-200 hover:scale-125"
-              style={{ backgroundColor: getEmotionConfig(currentEmotion).dot }}
-            />
-          </EmotionTooltip>
-        ) : (
-          <span className="block w-5 h-5 rounded-full bg-gray-200/80 ring-2 ring-white/60 shadow-sm" />
-        )}
-      </div>
+      {/* Spacer to balance layout */}
+      <div className="w-8" />
 
       {/* Record button + label */}
       <div className="flex flex-col items-center gap-2">
-        <div className="relative flex items-center justify-center">
+        <div
+          className="relative flex items-center justify-center"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
           {isRecording && (
             <>
               <span className="absolute w-32 h-32 rounded-full bg-red-400/20 animate-ping" />
@@ -151,6 +159,18 @@ function RecordButton({
                 style={{ animationDelay: "0.3s" }}
               />
             </>
+          )}
+
+          {/* Emotion border ring — rendered as a slightly larger circle behind the button */}
+          {currentEmotion && !isRecording && (
+            <span
+              className="absolute rounded-full transition-all duration-700"
+              style={{
+                inset: "-4px",
+                background: `${cfg.dot}30`,
+                boxShadow: `0 0 0 2px ${cfg.dot}55`,
+              }}
+            />
           )}
 
           <button
@@ -197,6 +217,22 @@ function RecordButton({
               </svg>
             )}
           </button>
+
+          {/* Delayed emotion tag — appears below button after 2s hover */}
+          {emotionTagVisible && currentEmotion && (
+            <div
+              className="absolute top-full mt-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+                flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white
+                whitespace-nowrap shadow-md animate-[fadeSlideUp_0.3s_ease-out_forwards]"
+              style={{
+                background: `${cfg.dot}ee`,
+                boxShadow: `0 2px 12px ${cfg.dot}55`,
+              }}
+            >
+              <span>{cfg.icon}</span>
+              <span className="capitalize">{cfg.label}</span>
+            </div>
+          )}
         </div>
 
         <p
@@ -207,7 +243,7 @@ function RecordButton({
         </p>
       </div>
 
-      {/* Spacer to visually balance the left dot */}
+      {/* Spacer to visually balance */}
       <div className="w-8" />
     </div>
   );
