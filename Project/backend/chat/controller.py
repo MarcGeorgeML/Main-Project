@@ -1,3 +1,4 @@
+# chat/router.py
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 import uuid
 
@@ -11,16 +12,63 @@ from .models import JobMsgType
 chat_router = APIRouter(prefix="/chats", tags=["Chat"])
 
 
-@chat_router.post("/video")
+# ── Sessions ──────────────────────────────────────────────────────────────────
+
+@chat_router.post("/sessions")
+async def create_session(
+    db: DbSession,
+    payload: TokenData = Depends(auth_middleware),
+):
+    session = services.create_session(db, payload.user_id)
+    return {"session_id": str(session.id), "created_at": session.created_at}
+
+
+@chat_router.get("/sessions")
+async def get_sessions(
+    db: DbSession,
+    payload: TokenData = Depends(auth_middleware),
+):
+    sessions = services.get_all_sessions(db, payload.user_id)
+    result = []
+    for s in sessions:
+        first_msg = s.chats[0].transcription if s.chats else None
+        result.append({
+            "session_id": str(s.id),
+            "first_message": first_msg,
+            "updated_at": s.updated_at,
+            "created_at": s.created_at,
+        })
+    return result
+
+
+@chat_router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: uuid.UUID,
+    db: DbSession,
+    payload: TokenData = Depends(auth_middleware),
+):
+    session = services.get_session(db, session_id, payload.user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    services.delete_session(db, session_id, payload.user_id)
+    return {"message": "Session deleted"}
+
+
+# ── Video / Chat ──────────────────────────────────────────────────────────────
+
+@chat_router.post("/sessions/{session_id}/video")
 async def send_video(
+    session_id: uuid.UUID,
     db: DbSession,
     video: UploadFile = File(...),
     payload: TokenData = Depends(auth_middleware),
 ):
+    session = services.get_session(db, session_id, payload.user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
     try:
         request_id = str(uuid.uuid4())
-
-        # save_video now transcodes webm → proper H264/AAC MP4 automatically
         video_path = services.save_video(
             video=video,
             user_id=str(payload.user_id),
@@ -28,7 +76,6 @@ async def send_video(
         )
 
         latest_emotion = services.get_latest_emotion(db, payload.user_id)
-
         job_data = JobMsgType(
             user_id=str(payload.user_id),
             type="video",
@@ -42,12 +89,15 @@ async def send_video(
         chat = services.create_chat_entry(
             db=db,
             user_id=payload.user_id,
+            session_id=session_id,
             video_url=str(video_path),
             transcription=response.get("transcription"),
             detected_emotion=response.get("emotion"),
             emotion_confidence=response.get("confidence"),
             ai_response=response.get("message"),
         )
+
+        services.touch_session(db, session_id)
 
         return {
             "chat_id": str(chat.id),
@@ -63,12 +113,17 @@ async def send_video(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@chat_router.get("")
-async def get_chat_history(
+@chat_router.get("/sessions/{session_id}")
+async def get_session_history(
+    session_id: uuid.UUID,
     db: DbSession,
     payload: TokenData = Depends(auth_middleware),
 ):
-    chats = services.get_all_chats(db, payload.user_id)
+    session = services.get_session(db, session_id, payload.user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    chats = services.get_chats_by_session(db, session_id, payload.user_id)
     return [
         {
             "id": str(chat.id),
@@ -83,8 +138,10 @@ async def get_chat_history(
     ]
 
 
+# ── Kept for compatibility ─────────────────────────────────────────────────────
+
 @chat_router.delete("")
-async def delete_chat_history(
+async def delete_all_history(
     db: DbSession,
     payload: TokenData = Depends(auth_middleware),
 ):
@@ -99,26 +156,3 @@ async def get_current_emotion(
 ):
     emotion = services.get_latest_emotion(db, payload.user_id)
     return {"current_emotion": emotion}
-
-
-@chat_router.get("/test")
-async def testing(payload: TokenData = Depends(auth_middleware)):
-    print("/chats/test")
-    request_id = str(uuid.uuid4())
-
-    try:
-        await redis_client.send_to_engine(
-            request_id=request_id,
-            data={"email": payload.email},
-        )
-
-        ack_response = await redis_client.wait_for_response(request_id, timeout=10.0)
-
-        return {
-            "message": ack_response.get("message"),
-            "request_id": request_id,
-        }
-    except TimeoutError:
-        raise HTTPException(status_code=408, detail="Request Timeout")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
