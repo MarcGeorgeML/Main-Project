@@ -29,7 +29,7 @@ const EMOTION_CONFIG: Record<string, { label: string; dot: string; icon: string 
   happy:     { label: "Happy",     dot: "#F5D000", icon: "😊" },
   sad:       { label: "Sad",       dot: "#4A90D9", icon: "😔" },
   angry:     { label: "Angry",     dot: "#E8362A", icon: "😠" },
-  fearful:   { label: "Fearful",   dot: "#9B59B6", icon: "😨" },
+  fear:   { label: "Fearful",   dot: "#9B59B6", icon: "😨" },
   disgust: { label: "Disgust", dot: "#4CAF50", icon: "😒" },
   surprised: { label: "Surprised", dot: "#F5821F", icon: "😲" },
   neutral:   { label: "Neutral",   dot: "#94A3B8", icon: "😐" },

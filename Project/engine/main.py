@@ -80,19 +80,36 @@ def main():
                         current_confidence = round(best.confidence, 4)
                         transcription      = best.text
 
-                        # ── 2. Build history list for LLM ────────────────────
+                        # ── 2. Print all emotions and their confidence scores ─
+                        print("\n[Emotion Scores]")
+                        if best.all_scores:
+                            # Sort by score descending for readability
+                            sorted_scores = sorted(
+                                best.all_scores.items(),
+                                key=lambda x: x[1],
+                                reverse=True
+                            )
+                            for emotion_label, score in sorted_scores:
+                                bar = "█" * int(score * 20)  # simple visual bar (max 20 chars)
+                                print(f"  {emotion_label:<10} {score:.4f}  {bar}")
+                        print(f"  → Best: {current_emotion} ({current_confidence:.4f})")
+
+                        # ── 3. Build history list for LLM ────────────────────
                         # history comes from the backend as a list of dicts:
                         # [{ user_message, ai_response, emotion, confidence }, ...]
                         history = data.history if hasattr(data, "history") and data.history else []
 
-                        # ── 3. Compute global emotion state ──────────────────
+                        # ── 4. Compute global emotion state via LLM ──────────
                         # Include current turn in the full picture for emotion_state
                         full_emotion_series = list(history) + [
                             HistoryItem(user_message="", ai_response="", emotion=current_emotion, confidence=current_confidence)
                         ]
-                        emotion_state = compute_emotion_state(full_emotion_series)
+                        emotion_state = compute_emotion_state(
+                            full_emotion_series,
+                            llm=llm_pipeline.llm,   # pass the ChatGroq instance
+                        )
 
-                        # ── 4. Generate empathetic LLM response ──────────────
+                        # ── 5. Generate empathetic LLM response ──────────────
                         ai_message = llm_pipeline.generate_response(
                             transcription=transcription,
                             current_emotion=current_emotion,
@@ -117,8 +134,9 @@ def main():
                             "error": "invalid request type"
                         }
 
-                    print("Request ID   :", request.request_id)
+                    print("\nRequest ID   :", request.request_id)
                     print("User         :", data.user_id)
+                    print("Transcription:", response.get("transcription", "N/A"))
                     print("Emotion      :", response.get("emotion", "N/A"))
                     print("Confidence   :", response.get("confidence", "N/A"))
                     print("Emotion State:", response.get("emotion_state", "N/A"))
