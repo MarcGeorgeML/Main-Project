@@ -145,7 +145,6 @@ def create_chat_entry(
     detected_emotion: str,
     emotion_confidence: float,
     ai_response: str,
-    emotion_state: Optional[str] = None,
 ) -> Chat:
     chat = Chat(
         user_id=user_id,
@@ -156,7 +155,6 @@ def create_chat_entry(
         emotion_confidence=emotion_confidence,
         latest_emotional_state=detected_emotion,
         ai_response=ai_response,
-        emotion_state=emotion_state,
     )
     db.add(chat)
     db.commit()

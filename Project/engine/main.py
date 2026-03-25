@@ -4,7 +4,7 @@ import json
 import os
 import sys
 from dotenv import load_dotenv
-from schemas.requests import ChatHistoryItem as HistoryItem
+# from schemas.requests import ChatHistoryItem as HistoryItem
 
 
 load_dotenv()
@@ -13,7 +13,7 @@ load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "snn", "inference"))
 
 from snn.inference.pipeline import InferencePipeline
-from llm import LLMChatPipeline, compute_emotion_state
+from llm import LLMChatPipeline
 
 ACK_CHANNEL = "ack_channel"
 JOB_STREAM = "job"
@@ -99,22 +99,11 @@ def main():
                         # [{ user_message, ai_response, emotion, confidence }, ...]
                         history = data.history if hasattr(data, "history") and data.history else []
 
-                        # ── 4. Compute global emotion state via LLM ──────────
-                        # Include current turn in the full picture for emotion_state
-                        full_emotion_series = list(history) + [
-                            HistoryItem(user_message="", ai_response="", emotion=current_emotion, confidence=current_confidence)
-                        ]
-                        emotion_state = compute_emotion_state(
-                            full_emotion_series,
-                            llm=llm_pipeline.llm,   # pass the ChatGroq instance
-                        )
-
-                        # ── 5. Generate empathetic LLM response ──────────────
+                        # ── 4. Generate empathetic LLM response ──────────────
                         ai_message = llm_pipeline.generate_response(
                             transcription=transcription,
                             current_emotion=current_emotion,
                             current_confidence=current_confidence,
-                            emotion_state=emotion_state,
                             history=history,
                         )
 
@@ -125,7 +114,6 @@ def main():
                             "transcription": transcription,
                             "all_scores":    best.all_scores,
                             "message":       ai_message,
-                            "emotion_state": emotion_state,
                         }
 
                     else:
@@ -139,7 +127,6 @@ def main():
                     print("Transcription:", response.get("transcription", "N/A"))
                     print("Emotion      :", response.get("emotion", "N/A"))
                     print("Confidence   :", response.get("confidence", "N/A"))
-                    print("Emotion State:", response.get("emotion_state", "N/A"))
                     print("-" * 60)
 
                     client.publish_ack(ACK_CHANNEL, response)

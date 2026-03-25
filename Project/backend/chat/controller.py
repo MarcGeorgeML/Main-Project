@@ -113,7 +113,6 @@ async def send_video(
             detected_emotion=response.get("emotion"),
             emotion_confidence=response.get("confidence"),
             ai_response=response.get("message"),
-            emotion_state=response.get("emotion_state"),
         )
 
         services.touch_session(db, session_id)
@@ -125,7 +124,6 @@ async def send_video(
             "emotion": chat.detected_emotion,
             "confidence": chat.emotion_confidence,
             "latest_emotional_state": chat.latest_emotional_state,
-            "emotion_state": chat.emotion_state,
             "created_at": chat.created_at,
         }
 
@@ -152,7 +150,6 @@ async def get_session_history(
             "ai_response": chat.ai_response,
             "emotion": chat.detected_emotion,
             "confidence": chat.emotion_confidence,
-            "emotion_state": chat.emotion_state,
             "created_at": chat.created_at,
         }
         for chat in chats

@@ -6,7 +6,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   sendVideoChat,
   getSessionHistory,
-  getCurrentEmotion,
   getSessions,
   createSession,
   deleteSession,
@@ -29,8 +28,8 @@ const EMOTION_CONFIG: Record<string, { label: string; dot: string; icon: string 
   happy:     { label: "Happy",     dot: "#F5D000", icon: "😊" },
   sad:       { label: "Sad",       dot: "#4A90D9", icon: "😔" },
   angry:     { label: "Angry",     dot: "#E8362A", icon: "😠" },
-  fear:   { label: "Fearful",   dot: "#9B59B6", icon: "😨" },
-  disgust: { label: "Disgust", dot: "#4CAF50", icon: "😒" },
+  fear:      { label: "Fearful",   dot: "#9B59B6", icon: "😨" },
+  disgust:   { label: "Disgust",   dot: "#4CAF50", icon: "😒" },
   surprised: { label: "Surprised", dot: "#F5821F", icon: "😲" },
   neutral:   { label: "Neutral",   dot: "#94A3B8", icon: "😐" },
 };
@@ -81,35 +80,30 @@ function EmotionDot({ emotion, confidence }: { emotion?: string | null; confiden
 }
 
 // ─── Record Button ────────────────────────────────────────────────────────────
-function RecordButton({ isRecording, isLoading, currentEmotion, onToggle, onLabelClick }: {
-  isRecording: boolean; isLoading: boolean; currentEmotion: string | null;
-  onToggle: () => void; onLabelClick: () => void;
+function RecordButton({ isRecording, isLoading, onToggle, onLabelClick }: {
+  isRecording: boolean;
+  isLoading: boolean;
+  onToggle: () => void;
+  onLabelClick: () => void;
 }) {
-  const [emotionTagVisible, setEmotionTagVisible] = useState(false);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cfg = getEmotionConfig(currentEmotion);
-
   return (
     <div className="flex items-center gap-5">
       <div className="w-8" />
       <div className="flex flex-col items-center gap-2">
-        <div className="relative flex items-center justify-center"
-          onMouseEnter={() => { hoverTimerRef.current = setTimeout(() => setEmotionTagVisible(true), 2000); }}
-          onMouseLeave={() => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); setEmotionTagVisible(false); }}>
+        <div className="relative flex items-center justify-center">
           {isRecording && (
             <>
               <span className="absolute w-32 h-32 rounded-full bg-red-400/20 animate-ping" />
               <span className="absolute w-28 h-28 rounded-full bg-red-400/15 animate-ping" style={{ animationDelay: "0.3s" }} />
             </>
           )}
-          {currentEmotion && !isRecording && (
-            <span className="absolute rounded-full transition-all duration-700"
-              style={{ inset: "-4px", background: `${cfg.dot}30`, boxShadow: `0 0 0 2px ${cfg.dot}55` }} />
-          )}
-          <button onClick={onToggle} disabled={isLoading}
+          <button
+            onClick={onToggle}
+            disabled={isLoading}
             className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${isRecording ? "bg-red-500 hover:bg-red-600" : "bg-white hover:bg-gray-50"}`}
             style={!isRecording ? { boxShadow: "0 4px 24px rgba(139,92,246,0.25), 0 2px 8px rgba(0,0,0,0.08)" } : {}}
-            aria-label={isRecording ? "Stop recording" : "Start recording"}>
+            aria-label={isRecording ? "Stop recording" : "Start recording"}
+          >
             {isLoading ? (
               <svg className="w-7 h-7 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#8B5CF6" strokeWidth="4" />
@@ -132,16 +126,11 @@ function RecordButton({ isRecording, isLoading, currentEmotion, onToggle, onLabe
               </svg>
             )}
           </button>
-          {emotionTagVisible && currentEmotion && (
-            <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white whitespace-nowrap shadow-md"
-              style={{ background: `${cfg.dot}ee`, boxShadow: `0 2px 12px ${cfg.dot}55` }}>
-              <span>{cfg.icon}</span>
-              <span className="capitalize">{cfg.label}</span>
-            </div>
-          )}
         </div>
-        <p onClick={!isRecording && !isLoading ? onLabelClick : undefined}
-          className="text-xs text-gray-400/80 tracking-wide select-none">
+        <p
+          onClick={!isRecording && !isLoading ? onLabelClick : undefined}
+          className="text-xs text-gray-400/80 tracking-wide select-none"
+        >
           {isLoading ? "Processing…" : isRecording ? "Recording — tap to stop" : "Tap to speak"}
         </p>
       </div>
@@ -195,7 +184,6 @@ export default function ChatClient() {
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
-  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -214,20 +202,11 @@ export default function ChatClient() {
     const init = async () => {
       setIsFetching(true);
       try {
-        const [sessionsRes, emotionRes] = await Promise.all([
-          getSessions(),
-          getCurrentEmotion().catch(() => null),
-        ]);
-
+        const sessionsRes = await getSessions();
         const sessionList = sessionsRes.data;
         setSessions(sessionList);
 
-        if (emotionRes?.data?.current_emotion) {
-          setCurrentEmotion(emotionRes.data.current_emotion);
-        }
-
         if (sessionList.length > 0) {
-          // Auto-select the most recent session
           await loadSession(sessionList[0].session_id, false);
         }
       } catch (err) {
@@ -252,8 +231,6 @@ export default function ChatClient() {
         return msgs;
       });
       setMessages(display);
-      const lastChat = chats[chats.length - 1];
-      if (lastChat?.emotion_state) setCurrentEmotion(lastChat.emotion_state);
       setActiveSessionId(sessionId);
       setError(null);
     } catch (err) {
@@ -270,12 +247,10 @@ export default function ChatClient() {
       const res = await createSession();
       const newSessionId = res.data.session_id;
 
-      // Refresh session list
       const sessionsRes = await getSessions();
       setSessions(sessionsRes.data);
 
       setMessages([]);
-      setCurrentEmotion(null);  
       setActiveSessionId(newSessionId);
       setDrawerOpen(false);
       setError(null);
@@ -310,7 +285,6 @@ export default function ChatClient() {
 
   // Recording
   const startRecording = async () => {
-    // Auto-create a session if none exists
     let sessionId = activeSessionId;
     if (!sessionId) {
       try {
@@ -358,16 +332,23 @@ export default function ChatClient() {
       const response = await sendVideoChat(sessionId, videoBlob);
       const data: ChatResponse = response.data;
 
-      const userMsg: DisplayMessage = { id: `user-${data.chat_id}`, sender: "USER", text: data.transcription || "(no speech detected)", emotion: data.emotion, confidence: data.confidence, created_at: data.created_at };
-      const aiMsg: DisplayMessage = { id: `ai-${data.chat_id}`, sender: "AI", text: data.ai_response || "", created_at: data.created_at };
+      const userMsg: DisplayMessage = {
+        id: `user-${data.chat_id}`,
+        sender: "USER",
+        text: data.transcription || "(no speech detected)",
+        emotion: data.emotion,
+        confidence: data.confidence,
+        created_at: data.created_at,
+      };
+      const aiMsg: DisplayMessage = {
+        id: `ai-${data.chat_id}`,
+        sender: "AI",
+        text: data.ai_response || "",
+        created_at: data.created_at,
+      };
 
       setMessages((prev) => [...prev, userMsg, aiMsg]);
 
-      if (data.emotion_state) setCurrentEmotion(data.emotion_state);
-      else if (data.latest_emotional_state) setCurrentEmotion(data.latest_emotional_state);
-      else if (data.emotion) setCurrentEmotion(data.emotion);
-
-      // Refresh session list so first_message + updated_at stay current
       const sessionsRes = await getSessions();
       setSessions(sessionsRes.data);
 
@@ -431,9 +412,8 @@ export default function ChatClient() {
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0"
         style={{ height: "75%", background: "radial-gradient(ellipse 80% 60% at 50% 100%, rgba(139,92,246,0.30) 0%, rgba(217,70,239,0.20) 30%, rgba(139,92,246,0.10) 60%, transparent 100%)" }} />
 
-      {/* Top bar — hamburger left, clear right */}
+      {/* Top bar */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4 flex-shrink-0">
-        {/* Hamburger */}
         <button
           onClick={() => setDrawerOpen(true)}
           className="p-2 rounded-xl text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-all duration-200 cursor-pointer"
@@ -444,7 +424,6 @@ export default function ChatClient() {
           </svg>
         </button>
 
-        {/* Clear history */}
         {messages.length > 0 && activeSessionId && (
           <button
             onClick={async () => {
@@ -528,7 +507,6 @@ export default function ChatClient() {
         <RecordButton
           isRecording={isRecording}
           isLoading={isLoading}
-          currentEmotion={currentEmotion}
           onToggle={handleToggleRecording}
           onLabelClick={handleLabelClick}
         />

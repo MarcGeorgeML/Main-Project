@@ -53,7 +53,6 @@ Guidelines for your responses:
 - The global emotional state gives you the broader picture of this session; \
   use it to gauge whether the user is improving, staying the same, or escalating.
 
-Current session's global emotional state: {emotion_state}
 """
 
 # ---------------------------------------------------------------------------
@@ -113,7 +112,6 @@ class LLMChatPipeline:
         transcription: str,
         current_emotion: str,
         current_confidence: float,
-        emotion_state: str,
         history: Optional[List[Dict]] = None,
     ) -> str:
         """
@@ -133,7 +131,7 @@ class LLMChatPipeline:
         history = history or []
 
         # Build the system message with dynamic emotion_state injected
-        system_content = SYSTEM_PROMPT.format(emotion_state=emotion_state)
+        system_content = SYSTEM_PROMPT
 
         # Build LangChain message list
         messages: List = [SystemMessage(content=system_content)]
