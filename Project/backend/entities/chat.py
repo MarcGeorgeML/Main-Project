@@ -32,6 +32,7 @@ class Chat(Base):
     detected_emotion = Column(String, nullable=True)
     emotion_confidence = Column(Float, nullable=True)
     latest_emotional_state = Column(String, nullable=True)
+    emotion_state = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", backref="chats")

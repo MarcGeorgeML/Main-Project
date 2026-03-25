@@ -150,3 +150,5 @@ groq>=0.37.1
 librosa>=0.11.0
 # openai-whisper>=20250625
 redis>=7.0.1
+langchain-groq 
+langchain-core

@@ -115,6 +115,27 @@ def get_latest_emotion(db: Session, user_id: uuid.UUID) -> str:
     return result if result else "neutral"
 
 
+def get_recent_chats_by_session(
+    db: Session,
+    session_id: uuid.UUID,
+    user_id: uuid.UUID,
+    limit: int = 5,
+) -> List[Chat]:
+    """
+    Return the most recent `limit` chats for a session, ordered oldest-first
+    so they read as natural conversation history for the LLM.
+    """
+    # Fetch the N most recent rows (desc), then reverse for chronological order
+    stmt = (
+        select(Chat)
+        .where(Chat.session_id == session_id, Chat.user_id == user_id)
+        .order_by(Chat.created_at.desc())
+        .limit(limit)
+    )
+    rows = db.execute(stmt).scalars().all()
+    return list(reversed(rows))
+
+
 def create_chat_entry(
     db: Session,
     user_id: uuid.UUID,
@@ -124,6 +145,7 @@ def create_chat_entry(
     detected_emotion: str,
     emotion_confidence: float,
     ai_response: str,
+    emotion_state: Optional[str] = None,
 ) -> Chat:
     chat = Chat(
         user_id=user_id,
@@ -134,6 +156,7 @@ def create_chat_entry(
         emotion_confidence=emotion_confidence,
         latest_emotional_state=detected_emotion,
         ai_response=ai_response,
+        emotion_state=emotion_state,
     )
     db.add(chat)
     db.commit()

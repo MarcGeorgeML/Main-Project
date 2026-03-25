@@ -7,9 +7,11 @@ from ..auth.models import TokenData
 from ..data.database import DbSession
 from ..data.redis_client import redis_client
 from . import services
-from .models import JobMsgType
+from .models import JobMsgType, ChatHistoryItem
 
 chat_router = APIRouter(prefix="/chats", tags=["Chat"])
+
+HISTORY_WINDOW = 5  # Number of previous turns sent to the engine as context
 
 
 # ── Sessions ──────────────────────────────────────────────────────────────────
@@ -76,11 +78,27 @@ async def send_video(
         )
 
         latest_emotion = services.get_latest_emotion(db, payload.user_id)
+
+        # ── Build recent history for LLM context ─────────────────────────────
+        recent_chats = services.get_recent_chats_by_session(
+            db, session_id, payload.user_id, limit=HISTORY_WINDOW
+        )
+        history = [
+            ChatHistoryItem(
+                user_message=chat.transcription or "",
+                ai_response=chat.ai_response or "",
+                emotion=chat.detected_emotion or "neutral",
+                confidence=chat.emotion_confidence or 0.5,
+            )
+            for chat in recent_chats
+        ]
+
         job_data = JobMsgType(
             user_id=str(payload.user_id),
             type="video",
             data=str(video_path),
             latest_emotion=latest_emotion,
+            history=history,
         )
 
         await redis_client.send_to_engine(request_id, job_data)
@@ -95,6 +113,7 @@ async def send_video(
             detected_emotion=response.get("emotion"),
             emotion_confidence=response.get("confidence"),
             ai_response=response.get("message"),
+            emotion_state=response.get("emotion_state"),
         )
 
         services.touch_session(db, session_id)
@@ -106,6 +125,7 @@ async def send_video(
             "emotion": chat.detected_emotion,
             "confidence": chat.emotion_confidence,
             "latest_emotional_state": chat.latest_emotional_state,
+            "emotion_state": chat.emotion_state,
             "created_at": chat.created_at,
         }
 
@@ -132,6 +152,7 @@ async def get_session_history(
             "ai_response": chat.ai_response,
             "emotion": chat.detected_emotion,
             "confidence": chat.emotion_confidence,
+            "emotion_state": chat.emotion_state,
             "created_at": chat.created_at,
         }
         for chat in chats

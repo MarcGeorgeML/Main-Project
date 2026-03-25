@@ -30,7 +30,7 @@ const EMOTION_CONFIG: Record<string, { label: string; dot: string; icon: string 
   sad:       { label: "Sad",       dot: "#4A90D9", icon: "😔" },
   angry:     { label: "Angry",     dot: "#E8362A", icon: "😠" },
   fearful:   { label: "Fearful",   dot: "#9B59B6", icon: "😨" },
-  disgusted: { label: "Disgusted", dot: "#4CAF50", icon: "😒" },
+  disgust: { label: "Disgust", dot: "#4CAF50", icon: "😒" },
   surprised: { label: "Surprised", dot: "#F5821F", icon: "😲" },
   neutral:   { label: "Neutral",   dot: "#94A3B8", icon: "😐" },
 };
@@ -252,6 +252,8 @@ export default function ChatClient() {
         return msgs;
       });
       setMessages(display);
+      const lastChat = chats[chats.length - 1];
+      if (lastChat?.emotion_state) setCurrentEmotion(lastChat.emotion_state);
       setActiveSessionId(sessionId);
       setError(null);
     } catch (err) {
@@ -273,6 +275,7 @@ export default function ChatClient() {
       setSessions(sessionsRes.data);
 
       setMessages([]);
+      setCurrentEmotion(null);  
       setActiveSessionId(newSessionId);
       setDrawerOpen(false);
       setError(null);
@@ -360,7 +363,8 @@ export default function ChatClient() {
 
       setMessages((prev) => [...prev, userMsg, aiMsg]);
 
-      if (data.latest_emotional_state) setCurrentEmotion(data.latest_emotional_state);
+      if (data.emotion_state) setCurrentEmotion(data.emotion_state);
+      else if (data.latest_emotional_state) setCurrentEmotion(data.latest_emotional_state);
       else if (data.emotion) setCurrentEmotion(data.emotion);
 
       // Refresh session list so first_message + updated_at stay current

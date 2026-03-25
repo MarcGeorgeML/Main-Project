@@ -20,6 +20,7 @@ export interface ChatResponse {
   confidence: number;
   latest_emotional_state: string;
   created_at: string;
+  emotion_state?: string | null;
 }
 
 export type ChatHistoryResponse = Chat[];
