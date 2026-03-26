@@ -131,7 +131,7 @@ function RecordButton({ isRecording, isLoading, onToggle, onLabelClick }: {
           onClick={!isRecording && !isLoading ? onLabelClick : undefined}
           className="text-xs text-gray-400/80 tracking-wide select-none"
         >
-          {isLoading ? "Processing…" : isRecording ? "Recording — tap to stop" : "Tap to speak"}
+          {isLoading ? "Understanding you..." : isRecording ? "I'm listening — tap when done" : "Share your thoughts"}
         </p>
       </div>
       <div className="w-8" />
@@ -386,7 +386,7 @@ export default function ChatClient() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
             style={{ borderColor: "#8B5CF6", borderTopColor: "transparent" }} />
-          <p className="text-sm text-gray-400">Loading your conversations…</p>
+          <p className="text-sm text-gray-400">Creating your safe space</p>
         </div>
       </div>
     );
@@ -461,10 +461,10 @@ export default function ChatClient() {
               </div>
               <div>
                 <p className="text-gray-700 font-medium">
-                  {activeSessionId ? "Start speaking" : "Create a session to begin"}
+                  {activeSessionId ? "I'm here to listen" : "Share what you feel"}
                 </p>
                 <p className="text-sm text-gray-400 mt-1">
-                  {activeSessionId ? "Tap the button below and start speaking" : "Use the menu on the top left to start a new session"}
+                  {activeSessionId ? "Share what's on your mind whenever you're ready" : "Tap the menu to create your safe space"}
                 </p>
               </div>
             </div>
