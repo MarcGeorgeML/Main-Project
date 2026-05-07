@@ -8,7 +8,7 @@ import numpy as np
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
-from SpikEmo_Model import SpikEmo
+from SentiCore_Model import SentiCore
 from spikformer import Spikformer
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -61,7 +61,7 @@ def extract_audio(mp3_path, target_dim=D_M_AUDIO):
     return mel.T.astype(np.float32)
 
 def main():
-    checkpoint = "model/spikemo_best_IEMOCAP.pt"
+    checkpoint = "model/SentiCore_best_IEMOCAP.pt"
     audio_file = "audio/laugh.mp3"
 
     print("Device:", DEVICE)
@@ -75,7 +75,7 @@ def main():
         heads=NUM_HEADS
     ).to(DEVICE)
 
-    model = SpikEmo(
+    model = SentiCore(
         dataset=DATASET,
         multi_attn_flag=MULTI_ATTN,
         roberta_dim=ROBERTA_DIM,

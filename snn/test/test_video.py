@@ -19,7 +19,7 @@ import numpy as np
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
-from SpikEmo_Model import SpikEmo
+from SentiCore_Model import SentiCore
 from spikformer import Spikformer
 
 # --------------------------------------------------
@@ -183,7 +183,7 @@ def extract_visual_features(video_path, target_len):
 # --------------------------------------------------
 def main():
 
-    checkpoint = "model/spikemo_best_IEMOCAP.pt"
+    checkpoint = "model/SentiCore_best_IEMOCAP.pt"
     video_file = "video/test3.mp4"
 
     # -----------------------------
@@ -199,9 +199,9 @@ def main():
     ).to(DEVICE)
 
     # -----------------------------
-    # Build SpikEmo
+    # Build SentiCore
     # -----------------------------
-    model = SpikEmo(
+    model = SentiCore(
         dataset=DATASET,
         multi_attn_flag=MULTI_ATTN,
         roberta_dim=ROBERTA_DIM,

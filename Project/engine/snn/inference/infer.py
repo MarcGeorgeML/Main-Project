@@ -20,7 +20,7 @@ def load_config(config_path: str) -> dict:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="SpikEmo — Multimodal Emotion Inference"
+        description="SentiCore — Multimodal Emotion Inference"
     )
     parser.add_argument(
         "--video",
@@ -32,7 +32,7 @@ def parse_args():
         "--weights",
         type=str,
         help="Path to the saved model weights (.pt checkpoint file)",
-        default="checkpoints/SpikEmo_T8_dim256_h4_lr4.9334886565290195e-05_bs32_20260323_124137/checkpoint_epoch37_f10.7924.pt"
+        default="checkpoints/SentiCore_T8_dim256_h4_lr4.9334886565290195e-05_bs32_20260323_124137/checkpoint_epoch37_f10.7924.pt"
     )
     parser.add_argument(
         "--config",

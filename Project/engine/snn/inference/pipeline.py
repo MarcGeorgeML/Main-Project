@@ -8,7 +8,7 @@ from spikingjelly.activation_based import functional
 
 # ── project imports ──────────────────────────────────────────────────────────
 from Model.spikformer import Spikformer                          # models/
-from Model.SpikEmo_Model import SpikEmo                          # models/
+from Model.SentiCore_Model import SentiCore                          # models/
 from preprocessing.whisper_segmenter import WhisperSegmenter             # preprocessing/
 from preprocessing.video_decoder import extract_audio, extract_frames   # preprocessing/
 from preprocessing.text_features import TextFeatureExtractor             # preprocessing/
@@ -57,7 +57,7 @@ class InferencePipeline:
             qk_scale   = model_config.get("qk_scale", 0.125),
         )
 
-        self.model = SpikEmo(
+        self.model = SentiCore(
             dataset          = model_config["dataset"],
             multi_attn_flag  = model_config["multi_attn_flag"],
             roberta_dim      = model_config["roberta_dim"],
@@ -163,7 +163,7 @@ class InferencePipeline:
         visuals: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Forward pass through SpikEmo, return softmax probabilities [B, n_classes].
+        Forward pass through SentiCore, return softmax probabilities [B, n_classes].
         """
         print("[pipeline] Running model inference ...")
         functional.reset_net(self.model)

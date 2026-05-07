@@ -3,7 +3,7 @@ from .MLP import MLP
 import torch
 import torch.nn as nn
 
-class SpikEmo(nn.Module):
+class SentiCore(nn.Module):
 
     def __init__(self, dataset, multi_attn_flag, roberta_dim, hidden_dim, dropout,
                  num_layers, model_dim, num_heads, D_m_audio, D_m_visual,
